@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Scanner · Séance</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --ink: #1a1a2e;
+    --accent: #4f46e5;
+    --accent2: #06b6d4;
+    --ok: #10b981;
+    --warn: #f59e0b;
+    --bg: #f4f4f9;
+    --card: #ffffff;
+    --muted: #6b7280;
+    --border: #e0e0ee;
+  }
+
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  /* ── Header ─────────────────────────────── */
+  header {
+    width: 100%;
+    background: var(--ink);
+    color: white;
+    padding: 14px 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  header .logo {
+    width: 34px; height: 34px;
+    background: var(--accent);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+  header h1 { font-size: 16px; font-weight: 700; letter-spacing: .5px; }
+  header p  { font-size: 11px; color: #a0a0cc; margin-top: 2px; }
+
+  /* ── Main ───────────────────────────────── */
+  main {
+    width: 100%;
+    max-width: 480px;
+    padding: 20px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    flex: 1;
+  }
+
+  /* ── Cards ──────────────────────────────── */
+  .card {
+    background: var(--card);
+    border-radius: 16px;
+    padding: 18px;
+    box-shadow: 0 2px 12px rgba(0,0,0,.06);
+    border: 1px solid var(--border);
+  }
+  .card-title {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+
+  /* ── Viewfinder ─────────────────────────── */
+  #scanner-wrap {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 3/4;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #000;
+  }
+
+  #video {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  #overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  /* Corners overlay */
+  .corner {
+    position: absolute;
+    width: 36px; height: 36px;
+    border-color: var(--accent2);
+    border-style: solid;
+    border-width: 0;
+  }
+  .corner.tl { top: 14px;  left: 14px;  border-top-width: 3px; border-left-width: 3px; border-top-left-radius: 4px; }
+  .corner.tr { top: 14px;  right: 14px; border-top-width: 3px; border-right-width: 3px; border-top-right-radius: 4px; }
+  .corner.bl { bottom: 14px; left: 14px;  border-bottom-width: 3px; border-left-width: 3px; border-bottom-left-radius: 4px; }
+  .corner.br { bottom: 14px; right: 14px; border-bottom-width: 3px; border-right-width: 3px; border-bottom-right-radius: 4px; }
+
+  /* Scan line animation */
+  #scan-line {
+    position: absolute;
+    left: 5%; right: 5%;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent2), transparent);
+    top: 10%;
+    animation: scanAnim 2.5s ease-in-out infinite;
+    border-radius: 2px;
+    box-shadow: 0 0 10px var(--accent2);
+  }
+  @keyframes scanAnim {
+    0%   { top: 10%; opacity: .8; }
+    50%  { top: 88%; opacity: 1; }
+    100% { top: 10%; opacity: .8; }
+  }
+
+  /* Status badge */
+  #status-badge {
+    position: absolute;
+    bottom: 14px; left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,.65);
+    backdrop-filter: blur(8px);
+    color: white;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 6px 14px;
+    border-radius: 20px;
+    white-space: nowrap;
+    transition: all .3s;
+  }
+  #status-badge.detected {
+    background: rgba(16,185,129,.85);
+  }
+
+  /* Canvas (hidden, for processing) */
+  #canvas { display: none; }
+
+  /* ── Buttons ────────────────────────────── */
+  .btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    padding: 14px;
+    border-radius: 12px;
+    font-size: 15px;
+    font-weight: 700;
+    border: none;
+    cursor: pointer;
+    transition: all .15s;
+  }
+  .btn:active { transform: scale(.97); }
+  .btn-primary { background: var(--accent); color: white; }
+  .btn-primary:hover { background: #4338ca; }
+  .btn-success { background: var(--ok); color: white; }
+  .btn-outline {
+    background: transparent;
+    border: 2px solid var(--border);
+    color: var(--ink);
+  }
+  .btn-sm {
+    padding: 9px 16px;
+    font-size: 13px;
+    border-radius: 8px;
+    width: auto;
+  }
+
+  /* ── Tips ───────────────────────────────── */
+  .tips { display: flex; flex-direction: column; gap: 8px; }
+  .tip {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.4;
+  }
+  .tip-icon {
+    width: 24px; height: 24px;
+    border-radius: 6px;
+    background: var(--bg);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px;
+    flex-shrink: 0;
+  }
+
+  /* ── Result panel ───────────────────────── */
+  #result-panel { display: none; }
+  #result-panel.visible { display: block; }
+
+  .result-img-wrap {
+    position: relative;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 2px solid var(--ok);
+  }
+  #result-img { width: 100%; display: block; }
+
+  .result-info {
+    display: flex;
+    gap: 10px;
+    margin-top: 12px;
+    flex-wrap: wrap;
+  }
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 20px;
+  }
+  .badge-ok   { background: #d1fae5; color: #065f46; }
+  .badge-info { background: #dbeafe; color: #1e40af; }
+  .badge-warn { background: #fef3c7; color: #92400e; }
+
+  /* Detected markers */
+  #markers-info {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 8px;
+  }
+
+  .row-btns {
+    display: flex;
+    gap: 10px;
+    margin-top: 12px;
+  }
+
+  /* ── Overlay canvas for markers ─────────── */
+  #detect-canvas {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  /* ── Export box ─────────────────────────── */
+  #export-box { display: none; }
+  #export-box.visible { display: block; }
+
+  .export-info {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+  .export-info strong { color: var(--ink); }
+
+  /* Loading spinner */
+  .spinner {
+    width: 20px; height: 20px;
+    border: 3px solid rgba(255,255,255,.3);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin .7s linear infinite;
+    display: inline-block;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">📋</div>
+  <div>
+    <h1>Scanner · Séance</h1>
+    <p>Détection des repères visuels</p>
+  </div>
+</header>
+
+<main>
+
+  <!-- Scanner card -->
+  <div class="card" id="scanner-card">
+    <div class="card-title">📷 Caméra</div>
+
+    <div id="scanner-wrap">
+      <video id="video" autoplay playsinline muted></video>
+      <canvas id="canvas"></canvas>
+
+      <!-- Overlay SVG corners -->
+      <div id="overlay">
+        <div class="corner tl"></div>
+        <div class="corner tr"></div>
+        <div class="corner bl"></div>
+        <div class="corner br"></div>
+        <div id="scan-line"></div>
+        <span id="status-badge">Pointez vers la feuille…</span>
+      </div>
+    </div>
+
+    <div style="margin-top:14px; display:flex; gap:10px;">
+      <button class="btn btn-primary" id="btn-start">
+        <span>▶</span> Démarrer la caméra
+      </button>
+      <button class="btn btn-outline btn-sm" id="btn-upload" style="width:auto;padding:14px 16px;" title="Importer une photo">
+        🖼️
+      </button>
+    </div>
+    <input type="file" id="file-input" accept="image/*" style="display:none">
+  </div>
+
+  <!-- Tips card -->
+  <div class="card">
+    <div class="card-title">💡 Conseils</div>
+    <div class="tips">
+      <div class="tip">
+        <div class="tip-icon">☀️</div>
+        <span>Bonne luminosité — évitez les ombres sur la feuille</span>
+      </div>
+      <div class="tip">
+        <div class="tip-icon">📐</div>
+        <span>Cadrez les <strong>4 marqueurs</strong> noirs dans l'écran</span>
+      </div>
+      <div class="tip">
+        <div class="tip-icon">📏</div>
+        <span>Distance de 25–50 cm pour une capture nette</span>
+      </div>
+      <div class="tip">
+        <div class="tip-icon">🤚</div>
+        <span>Restez immobile 1 seconde pour déclencher la capture</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Result panel -->
+  <div class="card" id="result-panel">
+    <div class="card-title">✅ Feuille capturée</div>
+
+    <div class="result-img-wrap">
+      <img id="result-img" src="" alt="Capture">
+      <canvas id="detect-canvas"></canvas>
+    </div>
+
+    <div class="result-info">
+      <span class="badge badge-ok" id="badge-markers">⬛ 0/4 marqueurs</span>
+      <span class="badge badge-info" id="badge-date">📅 —</span>
+      <span class="badge badge-warn" id="badge-conf">🎯 —</span>
+    </div>
+
+    <div id="markers-info"></div>
+
+    <div class="row-btns">
+      <button class="btn btn-success btn-sm" id="btn-save">💾 Sauvegarder</button>
+      <button class="btn btn-outline btn-sm" id="btn-retry">🔄 Rescanner</button>
+      <button class="btn btn-outline btn-sm" id="btn-export">📤 Exporter</button>
+    </div>
+  </div>
+
+  <!-- Export box -->
+  <div class="card" id="export-box">
+    <div class="card-title">📤 Export</div>
+    <div class="export-info">
+      <strong>Image PNG capturée</strong> — prête au téléchargement.<br>
+      Vous pouvez l'ajouter à votre journal ou l'importer dans votre app fitness.
+    </div>
+    <div style="margin-top:12px; display:flex; gap:10px;">
+      <button class="btn btn-primary btn-sm" id="btn-download">⬇️ Télécharger PNG</button>
+      <button class="btn btn-outline btn-sm" id="btn-share">📱 Partager</button>
+    </div>
+  </div>
+
+</main>
+
+<script>
+// ─── State ────────────────────────────────────────────────────────────────
+const state = {
+  stream: null,
+  scanning: false,
+  capturedDataUrl: null,
+  detectionInterval: null,
+  stableFrames: 0,
+  STABLE_NEEDED: 6,   // frames stables avant capture auto
+};
+
+// ─── DOM ──────────────────────────────────────────────────────────────────
+const video       = document.getElementById('video');
+const canvas      = document.getElementById('canvas');
+const ctx         = canvas.getContext('2d', { willReadFrequently: true });
+const overlay     = document.getElementById('overlay');
+const statusBadge = document.getElementById('status-badge');
+const btnStart    = document.getElementById('btn-start');
+const btnUpload   = document.getElementById('btn-upload');
+const fileInput   = document.getElementById('file-input');
+const resultPanel = document.getElementById('result-panel');
+const resultImg   = document.getElementById('result-img');
+const detectCanvas= document.getElementById('detect-canvas');
+const dCtx        = detectCanvas.getContext('2d');
+const badgeMarkers= document.getElementById('badge-markers');
+const badgeDate   = document.getElementById('badge-date');
+const badgeConf   = document.getElementById('badge-conf');
+const markersInfo = document.getElementById('markers-info');
+const btnSave     = document.getElementById('btn-save');
+const btnRetry    = document.getElementById('btn-retry');
+const btnExport   = document.getElementById('btn-export');
+const exportBox   = document.getElementById('export-box');
+const btnDownload = document.getElementById('btn-download');
+const btnShare    = document.getElementById('btn-share');
+
+// ─── Camera ───────────────────────────────────────────────────────────────
+btnStart.addEventListener('click', async () => {
+  if (state.stream) { stopCamera(); return; }
+  await startCamera();
+});
+
+async function startCamera() {
+  try {
+    btnStart.innerHTML = '<div class="spinner"></div> Ouverture…';
+    btnStart.disabled = true;
+
+    const constraints = {
+      video: {
+        facingMode: { ideal: 'environment' },
+        width: { ideal: 1280 },
+        height: { ideal: 960 },
+      }
+    };
+    state.stream = await navigator.mediaDevices.getUserMedia(constraints);
+    video.srcObject = state.stream;
+    await video.play();
+
+    btnStart.innerHTML = '⏹ Arrêter';
+    btnStart.disabled = false;
+    btnStart.className = 'btn btn-outline';
+
+    state.scanning = true;
+    state.detectionInterval = setInterval(detectFrame, 200);
+  } catch(e) {
+    btnStart.innerHTML = '▶ Démarrer la caméra';
+    btnStart.disabled = false;
+    alert('Impossible d\'accéder à la caméra : ' + e.message);
+  }
+}
+
+function stopCamera() {
+  if (state.stream) {
+    state.stream.getTracks().forEach(t => t.stop());
+    state.stream = null;
+  }
+  clearInterval(state.detectionInterval);
+  state.scanning = false;
+  btnStart.innerHTML = '▶ Démarrer la caméra';
+  btnStart.className = 'btn btn-primary';
+  updateStatus('Caméra arrêtée', false);
+}
+
+// ─── File upload fallback ──────────────────────────────────────────────────
+btnUpload.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => processImage(ev.target.result, true);
+  reader.readAsDataURL(file);
+});
+
+// ─── Detection loop ────────────────────────────────────────────────────────
+function detectFrame() {
+  if (!state.scanning || video.readyState < 2) return;
+
+  canvas.width  = video.videoWidth;
+  canvas.height = video.videoHeight;
+  ctx.drawImage(video, 0, 0);
+
+  const result = analyzeFrame(canvas, ctx);
+  const found = result.markersFound;
+
+  if (found >= 3) {
+    state.stableFrames++;
+    updateStatus(`${found}/4 marqueurs détectés…`, true);
+    if (state.stableFrames >= state.STABLE_NEEDED) {
+      state.stableFrames = 0;
+      const dataUrl = canvas.toDataURL('image/png');
+      showResult(dataUrl, result);
+    }
+  } else {
+    state.stableFrames = 0;
+    updateStatus(found > 0 ? `${found}/4 marqueurs — cadrez mieux` : 'Pointez vers la feuille…', false);
+  }
+}
+
+// ─── Frame analysis (corner marker detection) ─────────────────────────────
+function analyzeFrame(cnv, cx) {
+  const w = cnv.width, h = cnv.height;
+  const imageData = cx.getImageData(0, 0, w, h);
+  const data = imageData.data;
+
+  // Check each corner quadrant for a high-density black square region
+  const quads = [
+    { name: 'TL', x1: 0,     y1: 0,     x2: w*.22, y2: h*.18 },
+    { name: 'TR', x1: w*.78, y1: 0,     x2: w,     y2: h*.18 },
+    { name: 'BL', x1: 0,     y1: h*.82, x2: w*.22, y2: h     },
+    { name: 'BR', x1: w*.78, y1: h*.82, x2: w,     y2: h     },
+  ];
+
+  let markersFound = 0;
+  const detected = [];
+
+  for (const q of quads) {
+    const density = getBlackDensity(data, w, q.x1, q.y1, q.x2, q.y2);
+    // A marker has ~40-65% black (border + pattern)
+    if (density > 0.25 && density < 0.75) {
+      markersFound++;
+      detected.push(q.name);
+    }
+  }
+
+  // Estimate confidence
+  const conf = Math.round((markersFound / 4) * 100);
+
+  return { markersFound, detected, conf };
+}
+
+function getBlackDensity(data, imgW, x1, y1, x2, y2) {
+  let black = 0, total = 0;
+  const THRESH = 80;
+  for (let y = Math.floor(y1); y < Math.floor(y2); y += 3) {
+    for (let x = Math.floor(x1); x < Math.floor(x2); x += 3) {
+      const i = (y * imgW + x) * 4;
+      const r = data[i], g = data[i+1], b = data[i+2];
+      const lum = 0.299*r + 0.587*g + 0.114*b;
+      if (lum < THRESH) black++;
+      total++;
+    }
+  }
+  return total > 0 ? black / total : 0;
+}
+
+// ─── Result display ────────────────────────────────────────────────────────
+function showResult(dataUrl, analysis) {
+  // Stop scanning
+  clearInterval(state.detectionInterval);
+  state.scanning = false;
+  state.capturedDataUrl = dataUrl;
+
+  // Stop camera preview (optional — keep live)
+  // stopCamera();
+
+  // Display
+  resultImg.src = dataUrl;
+  resultPanel.classList.add('visible');
+  resultPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  // Badges
+  const m = analysis.markersFound;
+  badgeMarkers.textContent = `⬛ ${m}/4 marqueurs`;
+  badgeMarkers.className = 'badge ' + (m === 4 ? 'badge-ok' : m >= 3 ? 'badge-info' : 'badge-warn');
+
+  const now = new Date();
+  badgeDate.textContent = `📅 ${now.toLocaleDateString('fr-FR')}`;
+
+  const conf = analysis.conf;
+  badgeConf.textContent = `🎯 ${conf}% précision`;
+  badgeConf.className = 'badge ' + (conf >= 75 ? 'badge-ok' : 'badge-warn');
+
+  markersInfo.textContent = `Détectés : ${analysis.detected.join(', ') || '—'}`;
+
+  // Draw detected corners on overlay canvas
+  drawMarkerOverlay(dataUrl, analysis);
+
+  updateStatus('✅ Feuille capturée !', true);
+}
+
+function drawMarkerOverlay(dataUrl, analysis) {
+  const img = new Image();
+  img.onload = () => {
+    detectCanvas.width  = resultImg.offsetWidth;
+    detectCanvas.height = resultImg.offsetHeight;
+    const scaleX = detectCanvas.width  / img.width;
+    const scaleY = detectCanvas.height / img.height;
+
+    const quads = {
+      TL: { cx: img.width*.11, cy: img.height*.09 },
+      TR: { cx: img.width*.89, cy: img.height*.09 },
+      BL: { cx: img.width*.11, cy: img.height*.91 },
+      BR: { cx: img.width*.89, cy: img.height*.91 },
+    };
+
+    dCtx.clearRect(0, 0, detectCanvas.width, detectCanvas.height);
+    for (const [name, pos] of Object.entries(quads)) {
+      const found = analysis.detected.includes(name);
+      dCtx.beginPath();
+      dCtx.arc(pos.cx * scaleX, pos.cy * scaleY, 12, 0, Math.PI*2);
+      dCtx.fillStyle = found ? 'rgba(16,185,129,.7)' : 'rgba(239,68,68,.7)';
+      dCtx.fill();
+      dCtx.strokeStyle = 'white';
+      dCtx.lineWidth = 2;
+      dCtx.stroke();
+      dCtx.fillStyle = 'white';
+      dCtx.font = 'bold 10px system-ui';
+      dCtx.textAlign = 'center';
+      dCtx.fillText(found ? '✓' : '✗', pos.cx * scaleX, pos.cy * scaleY + 4);
+    }
+  };
+  img.src = dataUrl;
+}
+
+function processImage(dataUrl, fromFile) {
+  // Analyze a static image
+  const img = new Image();
+  img.onload = () => {
+    canvas.width = img.width;
+    canvas.height = img.height;
+    ctx.drawImage(img, 0, 0);
+    const result = analyzeFrame(canvas, ctx);
+    showResult(dataUrl, result);
+  };
+  img.src = dataUrl;
+}
+
+// ─── UI helpers ────────────────────────────────────────────────────────────
+function updateStatus(msg, ok) {
+  statusBadge.textContent = msg;
+  statusBadge.className   = ok ? 'detected' : '';
+}
+
+// ─── Retry ────────────────────────────────────────────────────────────────
+btnRetry.addEventListener('click', () => {
+  resultPanel.classList.remove('visible');
+  exportBox.classList.remove('visible');
+  state.capturedDataUrl = null;
+  if (state.stream) {
+    state.scanning = true;
+    state.stableFrames = 0;
+    state.detectionInterval = setInterval(detectFrame, 200);
+    updateStatus('Pointez vers la feuille…', false);
+  }
+});
+
+// ─── Save (in memory list) ─────────────────────────────────────────────────
+const sessions = [];
+
+btnSave.addEventListener('click', () => {
+  if (!state.capturedDataUrl) return;
+  sessions.push({ date: new Date().toISOString(), img: state.capturedDataUrl });
+  btnSave.textContent = `✅ Sauvegardé (${sessions.length})`;
+  btnSave.disabled = true;
+  setTimeout(() => { btnSave.textContent = '💾 Sauvegarder'; btnSave.disabled = false; }, 2000);
+});
+
+// ─── Export ───────────────────────────────────────────────────────────────
+btnExport.addEventListener('click', () => {
+  exportBox.classList.toggle('visible');
+  exportBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+});
+
+btnDownload.addEventListener('click', () => {
+  if (!state.capturedDataUrl) return;
+  const a = document.createElement('a');
+  a.href = state.capturedDataUrl;
+  const d = new Date().toISOString().slice(0,10);
+  a.download = `seance_${d}.png`;
+  a.click();
+});
+
+btnShare.addEventListener('click', async () => {
+  if (!navigator.share || !state.capturedDataUrl) {
+    alert('Utilisez le bouton Télécharger puis partagez le fichier manuellement.');
+    return;
+  }
+  try {
+    const blob = await (await fetch(state.capturedDataUrl)).blob();
+    const file = new File([blob], 'seance.png', { type: 'image/png' });
+    await navigator.share({ files: [file], title: 'Ma séance' });
+  } catch(e) {
+    console.warn('Share error', e);
+  }
+});
+
+// ─── Init ─────────────────────────────────────────────────────────────────
+// Auto-start camera if permissions already granted
+navigator.permissions?.query({ name: 'camera' }).then(res => {
+  if (res.state === 'granted') startCamera();
+});
+</script>
+</body>
+</html>
