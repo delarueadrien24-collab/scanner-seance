@@ -3,695 +3,795 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>Scanner · Séance</title>
+<title>Scanner Séance</title>
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --ink:#1a1a2e;--accent:#4f46e5;--ok:#10b981;--warn:#f59e0b;
+  --bg:#f4f4f9;--card:#fff;--muted:#6b7280;--border:#e0e0ee;
+  --danger:#ef4444;
+}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--ink);min-height:100vh;}
 
-  :root {
-    --ink: #1a1a2e;
-    --accent: #4f46e5;
-    --accent2: #06b6d4;
-    --ok: #10b981;
-    --warn: #f59e0b;
-    --bg: #f4f4f9;
-    --card: #ffffff;
-    --muted: #6b7280;
-    --border: #e0e0ee;
-  }
+/* ── Header + tabs ── */
+header{background:var(--ink);color:#fff;padding:14px 18px 0;position:sticky;top:0;z-index:100;}
+.header-top{display:flex;align-items:center;gap:12px;padding-bottom:10px;}
+.logo{width:32px;height:32px;background:var(--accent);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;}
+.header-top h1{font-size:15px;font-weight:700;}
+.header-top p{font-size:11px;color:#a0a0cc;}
+.tabs{display:flex;gap:0;}
+.tab{flex:1;text-align:center;padding:8px 4px;font-size:12px;font-weight:600;color:#a0a0cc;cursor:pointer;border-bottom:3px solid transparent;transition:all .2s;}
+.tab.active{color:#fff;border-bottom-color:var(--accent);}
 
-  body {
-    font-family: 'Segoe UI', system-ui, sans-serif;
-    background: var(--bg);
-    color: var(--ink);
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-  }
+/* ── Steps bar ── */
+.steps-nav{display:flex;background:var(--ink);padding:0 18px 12px;gap:6px;}
+.step-dot{flex:1;height:3px;border-radius:2px;background:rgba(255,255,255,.2);transition:background .3s;}
+.step-dot.active{background:var(--accent);}
+.step-dot.done{background:var(--ok);}
 
-  /* ── Header ─────────────────────────────── */
-  header {
-    width: 100%;
-    background: var(--ink);
-    color: white;
-    padding: 14px 20px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    position: sticky;
-    top: 0;
-    z-index: 100;
-  }
-  header .logo {
-    width: 34px; height: 34px;
-    background: var(--accent);
-    border-radius: 8px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 18px;
-  }
-  header h1 { font-size: 16px; font-weight: 700; letter-spacing: .5px; }
-  header p  { font-size: 11px; color: #a0a0cc; margin-top: 2px; }
+/* ── Main ── */
+main{max-width:480px;margin:0 auto;padding:16px;display:flex;flex-direction:column;gap:14px;}
+.page{display:none;}
+.page.active{display:flex;flex-direction:column;gap:14px;}
 
-  /* ── Main ───────────────────────────────── */
-  main {
-    width: 100%;
-    max-width: 480px;
-    padding: 20px 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-    flex: 1;
-  }
+/* ── Cards ── */
+.card{background:var(--card);border-radius:16px;padding:18px;box-shadow:0 2px 12px rgba(0,0,0,.06);border:1px solid var(--border);}
+.card-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:12px;}
 
-  /* ── Cards ──────────────────────────────── */
-  .card {
-    background: var(--card);
-    border-radius: 16px;
-    padding: 18px;
-    box-shadow: 0 2px 12px rgba(0,0,0,.06);
-    border: 1px solid var(--border);
-  }
-  .card-title {
-    font-size: 12px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    color: var(--muted);
-    margin-bottom: 12px;
-  }
+/* ── Scanner ── */
+#scanner-wrap{position:relative;width:100%;aspect-ratio:3/4;border-radius:12px;overflow:hidden;background:#000;}
+#video{width:100%;height:100%;object-fit:cover;display:block;}
+.corner{position:absolute;width:32px;height:32px;border-color:#06b6d4;border-style:solid;border-width:0;}
+.corner.tl{top:12px;left:12px;border-top-width:3px;border-left-width:3px;border-top-left-radius:4px;}
+.corner.tr{top:12px;right:12px;border-top-width:3px;border-right-width:3px;border-top-right-radius:4px;}
+.corner.bl{bottom:12px;left:12px;border-bottom-width:3px;border-left-width:3px;border-bottom-left-radius:4px;}
+.corner.br{bottom:12px;right:12px;border-bottom-width:3px;border-right-width:3px;border-bottom-right-radius:4px;}
+#scan-line{position:absolute;left:5%;right:5%;height:2px;background:linear-gradient(90deg,transparent,#06b6d4,transparent);top:10%;animation:scanAnim 2.5s ease-in-out infinite;box-shadow:0 0 8px #06b6d4;}
+@keyframes scanAnim{0%{top:10%}50%{top:88%}100%{top:10%}}
+#status-badge{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.65);backdrop-filter:blur(8px);color:#fff;font-size:12px;font-weight:600;padding:5px 14px;border-radius:20px;white-space:nowrap;transition:all .3s;}
+#status-badge.ok{background:rgba(16,185,129,.85);}
+#status-badge.warn{background:rgba(245,158,11,.85);}
+canvas{display:none;}
 
-  /* ── Viewfinder ─────────────────────────── */
-  #scanner-wrap {
-    position: relative;
-    width: 100%;
-    aspect-ratio: 3/4;
-    border-radius: 12px;
-    overflow: hidden;
-    background: #000;
-  }
+/* ── Buttons ── */
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:13px;border-radius:12px;font-size:14px;font-weight:700;border:none;cursor:pointer;transition:all .15s;}
+.btn:active{transform:scale(.97);}
+.btn-primary{background:var(--accent);color:#fff;}
+.btn-outline{background:transparent;border:2px solid var(--border);color:var(--ink);}
+.btn-success{background:var(--ok);color:#fff;}
+.btn-danger{background:var(--danger);color:#fff;}
+.btn-sm{padding:8px 14px;font-size:13px;border-radius:8px;width:auto;}
+.row-btns{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;}
+.hidden{display:none!important;}
 
-  #video {
-    width: 100%; height: 100%;
-    object-fit: cover;
-    display: block;
-  }
+/* ── Misc ── */
+.ocr-loading{display:flex;flex-direction:column;align-items:center;gap:12px;padding:24px 0;}
+.spinner-ring{width:48px;height:48px;border:4px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.ocr-step{font-size:13px;color:var(--muted);text-align:center;}
+#preview-img{width:100%;border-radius:10px;border:2px solid var(--ok);display:block;}
+.badges{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}
+.badge{font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;}
+.badge-ok{background:#d1fae5;color:#065f46;}
+.badge-info{background:#dbeafe;color:#1e40af;}
+.badge-warn{background:#fef3c7;color:#92400e;}
+.form-section-title{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--accent);margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid var(--border);}
+.form-row{display:grid;gap:8px;margin-bottom:8px;}
+.form-row.c2{grid-template-columns:1fr 1fr;}
+.form-row.c3{grid-template-columns:1fr 1fr 1fr;}
+.field{display:flex;flex-direction:column;gap:4px;}
+.field label{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;}
+.field input,.field textarea{background:var(--bg);border:1.5px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;color:var(--ink);font-family:inherit;transition:border .2s;resize:vertical;min-height:36px;}
+.field input:focus,.field textarea:focus{outline:none;border-color:var(--accent);background:#fff;}
+.field.filled input,.field.filled textarea{border-color:#a7f3d0;background:#f0fdf4;}
+.partie-block{border:1.5px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px;position:relative;}
+.partie-num{position:absolute;top:-10px;left:12px;background:var(--ink);color:#fff;font-size:11px;font-weight:700;padding:2px 10px;border-radius:20px;}
+.sub-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;}
+.sub-grid.c3{grid-template-columns:1fr 1fr 1fr;}
 
-  #overlay {
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-  }
+/* ── LIBRARY ── */
+.lib-toolbar{display:flex;gap:8px;align-items:center;margin-bottom:14px;flex-wrap:wrap;}
+.lib-toolbar input[type=text]{flex:1;min-width:120px;background:var(--bg);border:1.5px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;color:var(--ink);}
+.lib-toolbar input[type=text]:focus{outline:none;border-color:var(--accent);}
+.folder-list{display:flex;flex-direction:column;gap:8px;}
+.folder-item{background:var(--bg);border:1.5px solid var(--border);border-radius:10px;overflow:hidden;}
+.folder-header{display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;user-select:none;}
+.folder-icon{font-size:16px;}
+.folder-name{flex:1;font-size:14px;font-weight:600;color:var(--ink);}
+.folder-count{font-size:11px;color:var(--muted);background:var(--border);padding:2px 8px;border-radius:20px;}
+.folder-chevron{font-size:12px;color:var(--muted);transition:transform .2s;}
+.folder-item.open .folder-chevron{transform:rotate(90deg);}
+.folder-body{display:none;padding:8px 10px;border-top:1px solid var(--border);background:#fff;}
+.folder-item.open .folder-body{display:block;}
+.session-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.session-card{border:1.5px solid var(--border);border-radius:10px;overflow:hidden;background:var(--bg);cursor:pointer;transition:border-color .2s;}
+.session-card:hover{border-color:var(--accent);}
+.session-thumb{width:100%;aspect-ratio:210/297;object-fit:cover;display:block;background:#e0e0ee;}
+.session-thumb-empty{width:100%;aspect-ratio:210/297;background:linear-gradient(135deg,#e0e0ee,#f4f4f9);display:flex;align-items:center;justify-content:center;font-size:28px;}
+.session-info{padding:8px 10px;}
+.session-name{font-size:12px;font-weight:600;color:var(--ink);margin-bottom:2px;word-break:break-word;}
+.session-meta{font-size:11px;color:var(--muted);}
+.session-actions{display:flex;gap:4px;padding:0 8px 8px;}
+.action-btn{flex:1;font-size:11px;font-weight:600;padding:5px 4px;border-radius:6px;border:1px solid var(--border);background:#fff;cursor:pointer;color:var(--muted);transition:all .15s;}
+.action-btn:hover{border-color:var(--accent);color:var(--accent);}
+.action-btn.del:hover{border-color:var(--danger);color:var(--danger);}
+.empty-lib{text-align:center;padding:40px 20px;color:var(--muted);}
+.empty-lib .empty-icon{font-size:40px;margin-bottom:10px;}
+.empty-lib p{font-size:13px;line-height:1.6;}
 
-  /* Corners overlay */
-  .corner {
-    position: absolute;
-    width: 36px; height: 36px;
-    border-color: var(--accent2);
-    border-style: solid;
-    border-width: 0;
-  }
-  .corner.tl { top: 14px;  left: 14px;  border-top-width: 3px; border-left-width: 3px; border-top-left-radius: 4px; }
-  .corner.tr { top: 14px;  right: 14px; border-top-width: 3px; border-right-width: 3px; border-top-right-radius: 4px; }
-  .corner.bl { bottom: 14px; left: 14px;  border-bottom-width: 3px; border-left-width: 3px; border-bottom-left-radius: 4px; }
-  .corner.br { bottom: 14px; right: 14px; border-bottom-width: 3px; border-right-width: 3px; border-bottom-right-radius: 4px; }
+/* ── Modal ── */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;display:flex;align-items:center;justify-content:center;padding:20px;}
+.modal{background:#fff;border-radius:16px;padding:20px;width:100%;max-width:360px;box-shadow:0 8px 32px rgba(0,0,0,.2);}
+.modal h3{font-size:15px;font-weight:700;margin-bottom:14px;}
+.modal input,.modal select{width:100%;background:var(--bg);border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;margin-bottom:10px;}
+.modal input:focus,.modal select:focus{outline:none;border-color:var(--accent);}
+.modal-btns{display:flex;gap:8px;margin-top:4px;}
 
-  /* Scan line animation */
-  #scan-line {
-    position: absolute;
-    left: 5%; right: 5%;
-    height: 2px;
-    background: linear-gradient(90deg, transparent, var(--accent2), transparent);
-    top: 10%;
-    animation: scanAnim 2.5s ease-in-out infinite;
-    border-radius: 2px;
-    box-shadow: 0 0 10px var(--accent2);
-  }
-  @keyframes scanAnim {
-    0%   { top: 10%; opacity: .8; }
-    50%  { top: 88%; opacity: 1; }
-    100% { top: 10%; opacity: .8; }
-  }
-
-  /* Status badge */
-  #status-badge {
-    position: absolute;
-    bottom: 14px; left: 50%;
-    transform: translateX(-50%);
-    background: rgba(0,0,0,.65);
-    backdrop-filter: blur(8px);
-    color: white;
-    font-size: 12px;
-    font-weight: 600;
-    padding: 6px 14px;
-    border-radius: 20px;
-    white-space: nowrap;
-    transition: all .3s;
-  }
-  #status-badge.detected {
-    background: rgba(16,185,129,.85);
-  }
-
-  /* Canvas (hidden, for processing) */
-  #canvas { display: none; }
-
-  /* ── Buttons ────────────────────────────── */
-  .btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    width: 100%;
-    padding: 14px;
-    border-radius: 12px;
-    font-size: 15px;
-    font-weight: 700;
-    border: none;
-    cursor: pointer;
-    transition: all .15s;
-  }
-  .btn:active { transform: scale(.97); }
-  .btn-primary { background: var(--accent); color: white; }
-  .btn-primary:hover { background: #4338ca; }
-  .btn-success { background: var(--ok); color: white; }
-  .btn-outline {
-    background: transparent;
-    border: 2px solid var(--border);
-    color: var(--ink);
-  }
-  .btn-sm {
-    padding: 9px 16px;
-    font-size: 13px;
-    border-radius: 8px;
-    width: auto;
-  }
-
-  /* ── Tips ───────────────────────────────── */
-  .tips { display: flex; flex-direction: column; gap: 8px; }
-  .tip {
-    display: flex;
-    align-items: flex-start;
-    gap: 10px;
-    font-size: 13px;
-    color: var(--muted);
-    line-height: 1.4;
-  }
-  .tip-icon {
-    width: 24px; height: 24px;
-    border-radius: 6px;
-    background: var(--bg);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 13px;
-    flex-shrink: 0;
-  }
-
-  /* ── Result panel ───────────────────────── */
-  #result-panel { display: none; }
-  #result-panel.visible { display: block; }
-
-  .result-img-wrap {
-    position: relative;
-    border-radius: 10px;
-    overflow: hidden;
-    border: 2px solid var(--ok);
-  }
-  #result-img { width: 100%; display: block; }
-
-  .result-info {
-    display: flex;
-    gap: 10px;
-    margin-top: 12px;
-    flex-wrap: wrap;
-  }
-  .badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    font-size: 11px;
-    font-weight: 700;
-    padding: 4px 10px;
-    border-radius: 20px;
-  }
-  .badge-ok   { background: #d1fae5; color: #065f46; }
-  .badge-info { background: #dbeafe; color: #1e40af; }
-  .badge-warn { background: #fef3c7; color: #92400e; }
-
-  /* Detected markers */
-  #markers-info {
-    font-size: 12px;
-    color: var(--muted);
-    margin-top: 8px;
-  }
-
-  .row-btns {
-    display: flex;
-    gap: 10px;
-    margin-top: 12px;
-  }
-
-  /* ── Overlay canvas for markers ─────────── */
-  #detect-canvas {
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-  }
-
-  /* ── Export box ─────────────────────────── */
-  #export-box { display: none; }
-  #export-box.visible { display: block; }
-
-  .export-info {
-    font-size: 13px;
-    color: var(--muted);
-    line-height: 1.6;
-  }
-  .export-info strong { color: var(--ink); }
-
-  /* Loading spinner */
-  .spinner {
-    width: 20px; height: 20px;
-    border: 3px solid rgba(255,255,255,.3);
-    border-top-color: white;
-    border-radius: 50%;
-    animation: spin .7s linear infinite;
-    display: inline-block;
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
+/* ── Session detail ── */
+#session-detail-img{width:100%;border-radius:10px;border:1px solid var(--border);display:block;margin-bottom:12px;}
 </style>
 </head>
 <body>
 
 <header>
-  <div class="logo">📋</div>
-  <div>
-    <h1>Scanner · Séance</h1>
-    <p>Détection des repères visuels</p>
+  <div class="header-top">
+    <div class="logo">📋</div>
+    <div><h1>Scanner · Séance</h1><p>Scan → OCR → Bibliothèque</p></div>
+    <div id="sync-status" style="margin-left:auto;font-size:11px;color:#a0a0cc;">Chargement…</div>
+  </div>
+  <div class="tabs">
+    <div class="tab active" id="tab-scan" onclick="switchTab('scan')">📷 Scanner</div>
+    <div class="tab" id="tab-lib" onclick="switchTab('lib')">📚 Bibliothèque</div>
   </div>
 </header>
 
-<main>
-
-  <!-- Scanner card -->
-  <div class="card" id="scanner-card">
-    <div class="card-title">📷 Caméra</div>
-
-    <div id="scanner-wrap">
-      <video id="video" autoplay playsinline muted></video>
-      <canvas id="canvas"></canvas>
-
-      <!-- Overlay SVG corners -->
-      <div id="overlay">
-        <div class="corner tl"></div>
-        <div class="corner tr"></div>
-        <div class="corner bl"></div>
-        <div class="corner br"></div>
+<!-- SCAN PAGE -->
+<div class="page active" id="page-scan">
+  <div class="steps-nav">
+    <div class="step-dot active" id="dot-1"></div>
+    <div class="step-dot" id="dot-2"></div>
+    <div class="step-dot" id="dot-3"></div>
+  </div>
+  <main>
+    <!-- SCAN -->
+    <div class="card" id="card-scan">
+      <div class="card-title">① Scanner la feuille</div>
+      <div id="scanner-wrap">
+        <video id="video" autoplay playsinline muted></video>
+        <canvas id="canvas"></canvas>
+        <div class="corner tl"></div><div class="corner tr"></div>
+        <div class="corner bl"></div><div class="corner br"></div>
         <div id="scan-line"></div>
-        <span id="status-badge">Pointez vers la feuille…</span>
+        <span id="status-badge">Démarrez la caméra</span>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:12px;">
+        <button class="btn btn-primary" id="btn-start">▶ Caméra</button>
+        <button class="btn btn-outline btn-sm" id="btn-upload" style="width:auto;padding:13px 16px;">🖼️ Importer</button>
+      </div>
+      <input type="file" id="file-input" accept="image/*" style="display:none">
+    </div>
+
+    <!-- PREVIEW -->
+    <div class="card hidden" id="card-preview">
+      <div class="card-title">② Feuille capturée</div>
+      <img id="preview-img" src="" alt="">
+      <div class="badges">
+        <span class="badge badge-ok"   id="b-markers">⬛ —</span>
+        <span class="badge badge-info" id="b-date">📅 —</span>
+        <span class="badge badge-info" id="b-conf">🎯 —</span>
+      </div>
+      <div class="row-btns">
+        <button class="btn btn-success btn-sm" id="btn-ocr">🔍 Lire (OCR)</button>
+        <button class="btn btn-outline btn-sm" id="btn-save-quick">💾 Sauvegarder</button>
+        <button class="btn btn-outline btn-sm" id="btn-retry">🔄 Rescanner</button>
       </div>
     </div>
 
-    <div style="margin-top:14px; display:flex; gap:10px;">
-      <button class="btn btn-primary" id="btn-start">
-        <span>▶</span> Démarrer la caméra
-      </button>
-      <button class="btn btn-outline btn-sm" id="btn-upload" style="width:auto;padding:14px 16px;" title="Importer une photo">
-        🖼️
-      </button>
+    <!-- OCR LOADING -->
+    <div class="card hidden" id="card-ocr">
+      <div class="card-title">② Lecture en cours…</div>
+      <div class="ocr-loading">
+        <div class="spinner-ring"></div>
+        <div class="ocr-step" id="ocr-step">Envoi à Claude…</div>
+      </div>
     </div>
-    <input type="file" id="file-input" accept="image/*" style="display:none">
+
+    <!-- FORM -->
+    <div class="card hidden" id="card-form">
+      <div class="card-title">③ Vérification &amp; édition</div>
+      <div style="margin-bottom:16px;">
+        <div class="form-section-title">Informations générales</div>
+        <div class="form-row c2">
+          <div class="field" id="fw-date"><label>Date</label><input type="text" id="v-date" placeholder="jj/mm/aaaa"></div>
+          <div class="field" id="fw-contexte"><label>Contexte</label><input type="text" id="v-contexte"></div>
+        </div>
+        <div class="form-row c3">
+          <div class="field" id="fw-pub1"><label>Public 1</label><input type="text" id="v-pub1"></div>
+          <div class="field" id="fw-pub2"><label>Public 2</label><input type="text" id="v-pub2"></div>
+          <div class="field" id="fw-pub3"><label>Public 3</label><input type="text" id="v-pub3"></div>
+        </div>
+      </div>
+      <div class="form-section-title">Parties de séance</div>
+      <div id="parties-container"></div>
+      <div class="row-btns">
+        <button class="btn btn-success btn-sm" id="btn-save-form">💾 Enregistrer dans la bibliothèque</button>
+        <button class="btn btn-outline btn-sm" id="btn-new">📷 Nouveau scan</button>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- LIBRARY PAGE -->
+<div class="page" id="page-lib">
+  <main>
+    <div class="card">
+      <div class="card-title">📚 Bibliothèque</div>
+      <div class="lib-toolbar">
+        <input type="text" id="lib-search" placeholder="🔍 Rechercher…">
+        <button class="btn btn-primary btn-sm" id="btn-new-folder">📁 Nouveau dossier</button>
+      </div>
+      <div id="folder-list" class="folder-list"></div>
+    </div>
+  </main>
+</div>
+
+<!-- MODAL : save session -->
+<div class="modal-bg hidden" id="modal-save">
+  <div class="modal">
+    <h3>💾 Enregistrer la séance</h3>
+    <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:4px;">Nom de la séance</label>
+    <input type="text" id="ms-name" placeholder="ex: Séance pressing U15 – 08/06">
+    <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:4px;">Dossier</label>
+    <select id="ms-folder"></select>
+    <div class="modal-btns">
+      <button class="btn btn-success btn-sm" id="ms-confirm">✅ Enregistrer</button>
+      <button class="btn btn-outline btn-sm" id="ms-cancel">Annuler</button>
+    </div>
   </div>
+</div>
 
-  <!-- Tips card -->
-  <div class="card">
-    <div class="card-title">💡 Conseils</div>
-    <div class="tips">
-      <div class="tip">
-        <div class="tip-icon">☀️</div>
-        <span>Bonne luminosité — évitez les ombres sur la feuille</span>
-      </div>
-      <div class="tip">
-        <div class="tip-icon">📐</div>
-        <span>Cadrez les <strong>4 marqueurs</strong> noirs dans l'écran</span>
-      </div>
-      <div class="tip">
-        <div class="tip-icon">📏</div>
-        <span>Distance de 25–50 cm pour une capture nette</span>
-      </div>
-      <div class="tip">
-        <div class="tip-icon">🤚</div>
-        <span>Restez immobile 1 seconde pour déclencher la capture</span>
-      </div>
+<!-- MODAL : new folder -->
+<div class="modal-bg hidden" id="modal-folder">
+  <div class="modal">
+    <h3>📁 Nouveau dossier</h3>
+    <input type="text" id="mf-name" placeholder="Nom du dossier…">
+    <div class="modal-btns">
+      <button class="btn btn-primary btn-sm" id="mf-confirm">Créer</button>
+      <button class="btn btn-outline btn-sm" id="mf-cancel">Annuler</button>
     </div>
   </div>
+</div>
 
-  <!-- Result panel -->
-  <div class="card" id="result-panel">
-    <div class="card-title">✅ Feuille capturée</div>
-
-    <div class="result-img-wrap">
-      <img id="result-img" src="" alt="Capture">
-      <canvas id="detect-canvas"></canvas>
-    </div>
-
-    <div class="result-info">
-      <span class="badge badge-ok" id="badge-markers">⬛ 0/4 marqueurs</span>
-      <span class="badge badge-info" id="badge-date">📅 —</span>
-      <span class="badge badge-warn" id="badge-conf">🎯 —</span>
-    </div>
-
-    <div id="markers-info"></div>
-
-    <div class="row-btns">
-      <button class="btn btn-success btn-sm" id="btn-save">💾 Sauvegarder</button>
-      <button class="btn btn-outline btn-sm" id="btn-retry">🔄 Rescanner</button>
-      <button class="btn btn-outline btn-sm" id="btn-export">📤 Exporter</button>
+<!-- MODAL : rename session -->
+<div class="modal-bg hidden" id="modal-rename">
+  <div class="modal">
+    <h3>✏️ Renommer</h3>
+    <input type="text" id="mr-name" placeholder="Nouveau nom…">
+    <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:4px;margin-top:4px;">Déplacer vers</label>
+    <select id="mr-folder"></select>
+    <div class="modal-btns">
+      <button class="btn btn-primary btn-sm" id="mr-confirm">✅ OK</button>
+      <button class="btn btn-outline btn-sm" id="mr-cancel">Annuler</button>
     </div>
   </div>
+</div>
 
-  <!-- Export box -->
-  <div class="card" id="export-box">
-    <div class="card-title">📤 Export</div>
-    <div class="export-info">
-      <strong>Image PNG capturée</strong> — prête au téléchargement.<br>
-      Vous pouvez l'ajouter à votre journal ou l'importer dans votre app fitness.
-    </div>
-    <div style="margin-top:12px; display:flex; gap:10px;">
-      <button class="btn btn-primary btn-sm" id="btn-download">⬇️ Télécharger PNG</button>
-      <button class="btn btn-outline btn-sm" id="btn-share">📱 Partager</button>
+<!-- MODAL : session detail -->
+<div class="modal-bg hidden" id="modal-detail">
+  <div class="modal" style="max-width:420px;">
+    <h3 id="detail-title">Séance</h3>
+    <img id="session-detail-img" src="" alt="">
+    <div id="detail-data" style="font-size:12px;color:var(--muted);line-height:1.7;max-height:200px;overflow-y:auto;"></div>
+    <div class="modal-btns" style="margin-top:12px;">
+      <button class="btn btn-primary btn-sm" id="detail-dl">⬇️ PNG</button>
+      <button class="btn btn-outline btn-sm" id="detail-close">Fermer</button>
     </div>
   </div>
-
-</main>
+</div>
 
 <script>
-// ─── State ────────────────────────────────────────────────────────────────
-const state = {
-  stream: null,
-  scanning: false,
-  capturedDataUrl: null,
-  detectionInterval: null,
-  stableFrames: 0,
-  STABLE_NEEDED: 6,   // frames stables avant capture auto
+// ════════════════════════════════════════════════════════
+// STATE
+// ════════════════════════════════════════════════════════
+const S={stream:null,scanning:false,stable:0,STABLE:8,dataUrl:null,interval:null,pendingData:null};
+const $=id=>document.getElementById(id);
+const show=id=>$(id).classList.remove('hidden');
+const hide=id=>$(id).classList.add('hidden');
+
+// ── Tab navigation ────────────────────────────────────
+function switchTab(t){
+  document.querySelectorAll('.tab').forEach(el=>el.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(el=>el.classList.remove('active'));
+  $('tab-'+t).classList.add('active');
+  $('page-'+t).classList.add('active');
+  if(t==='lib') renderLibrary();
+}
+
+// ── Step dots ─────────────────────────────────────────
+function setStep(n){[1,2,3].forEach(i=>{const d=$('dot-'+i);d.className='step-dot'+(i<n?' done':i===n?' active':'');});}
+function setStatus(msg,type){const b=$('status-badge');b.textContent=msg;b.className=type||'';}
+
+// ════════════════════════════════════════════════════════
+// GITHUB SYNC
+// ════════════════════════════════════════════════════════
+const GH={
+  token:'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',
+  owner:'delarueadrien24-collab',
+  repo:'Scanner-seance',
+  file:'bibliotheque.json',
+  branch:'main',
+  _sha:null
 };
+const GH_API=`https://api.github.com/repos/${GH.owner}/${GH.repo}/contents/${GH.file}`;
 
-// ─── DOM ──────────────────────────────────────────────────────────────────
-const video       = document.getElementById('video');
-const canvas      = document.getElementById('canvas');
-const ctx         = canvas.getContext('2d', { willReadFrequently: true });
-const overlay     = document.getElementById('overlay');
-const statusBadge = document.getElementById('status-badge');
-const btnStart    = document.getElementById('btn-start');
-const btnUpload   = document.getElementById('btn-upload');
-const fileInput   = document.getElementById('file-input');
-const resultPanel = document.getElementById('result-panel');
-const resultImg   = document.getElementById('result-img');
-const detectCanvas= document.getElementById('detect-canvas');
-const dCtx        = detectCanvas.getContext('2d');
-const badgeMarkers= document.getElementById('badge-markers');
-const badgeDate   = document.getElementById('badge-date');
-const badgeConf   = document.getElementById('badge-conf');
-const markersInfo = document.getElementById('markers-info');
-const btnSave     = document.getElementById('btn-save');
-const btnRetry    = document.getElementById('btn-retry');
-const btnExport   = document.getElementById('btn-export');
-const exportBox   = document.getElementById('export-box');
-const btnDownload = document.getElementById('btn-download');
-const btnShare    = document.getElementById('btn-share');
-
-// ─── Camera ───────────────────────────────────────────────────────────────
-btnStart.addEventListener('click', async () => {
-  if (state.stream) { stopCamera(); return; }
-  await startCamera();
-});
-
-async function startCamera() {
-  try {
-    btnStart.innerHTML = '<div class="spinner"></div> Ouverture…';
-    btnStart.disabled = true;
-
-    const constraints = {
-      video: {
-        facingMode: { ideal: 'environment' },
-        width: { ideal: 1280 },
-        height: { ideal: 960 },
-      }
-    };
-    state.stream = await navigator.mediaDevices.getUserMedia(constraints);
-    video.srcObject = state.stream;
-    await video.play();
-
-    btnStart.innerHTML = '⏹ Arrêter';
-    btnStart.disabled = false;
-    btnStart.className = 'btn btn-outline';
-
-    state.scanning = true;
-    state.detectionInterval = setInterval(detectFrame, 200);
-  } catch(e) {
-    btnStart.innerHTML = '▶ Démarrer la caméra';
-    btnStart.disabled = false;
-    alert('Impossible d\'accéder à la caméra : ' + e.message);
-  }
+async function fetchDBFromGitHub(){
+  try{
+    const res=await fetch(GH_API+'?ref='+GH.branch,{headers:{Authorization:'Bearer '+GH.token,Accept:'application/vnd.github+json'}});
+    if(res.status===404)return null;
+    const json=await res.json();
+    GH._sha=json.sha;
+    return JSON.parse(decodeURIComponent(escape(atob(json.content.replace(/\n/g,'')))));
+  }catch(e){console.warn('GH fetch',e);return null;}
 }
 
-function stopCamera() {
-  if (state.stream) {
-    state.stream.getTracks().forEach(t => t.stop());
-    state.stream = null;
-  }
-  clearInterval(state.detectionInterval);
-  state.scanning = false;
-  btnStart.innerHTML = '▶ Démarrer la caméra';
-  btnStart.className = 'btn btn-primary';
-  updateStatus('Caméra arrêtée', false);
-}
-
-// ─── File upload fallback ──────────────────────────────────────────────────
-btnUpload.addEventListener('click', () => fileInput.click());
-fileInput.addEventListener('change', (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = (ev) => processImage(ev.target.result, true);
-  reader.readAsDataURL(file);
-});
-
-// ─── Detection loop ────────────────────────────────────────────────────────
-function detectFrame() {
-  if (!state.scanning || video.readyState < 2) return;
-
-  canvas.width  = video.videoWidth;
-  canvas.height = video.videoHeight;
-  ctx.drawImage(video, 0, 0);
-
-  const result = analyzeFrame(canvas, ctx);
-  const found = result.markersFound;
-
-  if (found >= 3) {
-    state.stableFrames++;
-    updateStatus(`${found}/4 marqueurs détectés…`, true);
-    if (state.stableFrames >= state.STABLE_NEEDED) {
-      state.stableFrames = 0;
-      const dataUrl = canvas.toDataURL('image/png');
-      showResult(dataUrl, result);
+async function pushDBToGitHub(db){
+  setSyncStatus('sync','Sync…');
+  try{
+    const content=btoa(unescape(encodeURIComponent(JSON.stringify(db,null,2))));
+    const body={message:'sync: update bibliotheque',content,branch:GH.branch};
+    if(GH._sha)body.sha=GH._sha;
+    const res=await fetch(GH_API,{method:'PUT',headers:{Authorization:'Bearer '+GH.token,Accept:'application/vnd.github+json','Content-Type':'application/json'},body:JSON.stringify(body)});
+    if(res.ok){const j=await res.json();GH._sha=j.content.sha;setSyncStatus('ok','✓ Synchronisé');}
+    else{
+      const err=await res.json();console.error('GH push',err);
+      if(res.status===409||res.status===422){const fresh=await fetchDBFromGitHub();if(fresh){mergeAndPush(db,fresh);return;}}
+      setSyncStatus('error','Erreur sync');
     }
-  } else {
-    state.stableFrames = 0;
-    updateStatus(found > 0 ? `${found}/4 marqueurs — cadrez mieux` : 'Pointez vers la feuille…', false);
-  }
+  }catch(e){console.warn('GH push',e);setSyncStatus('error','Hors ligne');}
 }
 
-// ─── Frame analysis (corner marker detection) ─────────────────────────────
-function analyzeFrame(cnv, cx) {
-  const w = cnv.width, h = cnv.height;
-  const imageData = cx.getImageData(0, 0, w, h);
-  const data = imageData.data;
+function mergeAndPush(local,remote){
+  const merged={folders:[...remote.folders],sessions:[...remote.sessions]};
+  local.sessions.forEach(ls=>{if(!merged.sessions.find(s=>s.id===ls.id))merged.sessions.push(ls);});
+  local.folders.forEach(lf=>{if(!merged.folders.find(f=>f.id===lf.id))merged.folders.push(lf);});
+  pushDBToGitHub(merged);
+}
 
-  // Check each corner quadrant for a high-density black square region
-  const quads = [
-    { name: 'TL', x1: 0,     y1: 0,     x2: w*.22, y2: h*.18 },
-    { name: 'TR', x1: w*.78, y1: 0,     x2: w,     y2: h*.18 },
-    { name: 'BL', x1: 0,     y1: h*.82, x2: w*.22, y2: h     },
-    { name: 'BR', x1: w*.78, y1: h*.82, x2: w,     y2: h     },
+function setSyncStatus(state,msg){
+  const el=$('sync-status');if(!el)return;
+  const c={sync:'#f59e0b',ok:'#10b981',error:'#ef4444'};
+  el.textContent=msg;el.style.color=c[state]||'#aaa';
+}
+
+// ════════════════════════════════════════════════════════
+// STORAGE  (GitHub + localStorage fallback)
+// ════════════════════════════════════════════════════════
+let _dbCache=null;
+function loadDB(){return _dbCache||JSON.parse(localStorage.getItem('seance_db')||'null');}
+function saveDB(db){_dbCache=db;localStorage.setItem('seance_db',JSON.stringify(db));pushDBToGitHub(db);}
+function getDB(){let db=loadDB();if(!db)db={folders:[{id:'default',name:'Sans dossier'}],sessions:[]};return db;}
+
+async function initDB(){
+  setSyncStatus('sync','Chargement…');
+  const remote=await fetchDBFromGitHub();
+  if(remote){_dbCache=remote;localStorage.setItem('seance_db',JSON.stringify(remote));setSyncStatus('ok','✓ Synchronisé');}
+  else{setSyncStatus('error','Local uniquement');}
+  renderLibrary();
+}
+
+// ════════════════════════════════════════════════════════
+// CAMERA
+// ════════════════════════════════════════════════════════
+$('btn-start').addEventListener('click',()=>{if(S.stream)stopCam();else startCam();});
+$('btn-upload').addEventListener('click',()=>$('file-input').click());
+$('file-input').addEventListener('change',e=>{
+  const f=e.target.files[0];if(!f)return;
+  const r=new FileReader();r.onload=ev=>onCapture(ev.target.result);r.readAsDataURL(f);
+  e.target.value='';
+});
+
+async function startCam(){
+  try{
+    $('btn-start').innerHTML='⏳';$('btn-start').disabled=true;
+    S.stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:960}}});
+    $('video').srcObject=S.stream;await $('video').play();
+    $('btn-start').innerHTML='⏹ Arrêter';$('btn-start').disabled=false;$('btn-start').className='btn btn-outline';
+    S.scanning=true;S.interval=setInterval(detectFrame,200);
+    setStatus('Pointez vers la feuille…','');
+  }catch(e){$('btn-start').innerHTML='▶ Caméra';$('btn-start').disabled=false;alert('Caméra : '+e.message);}
+}
+function stopCam(){
+  S.stream?.getTracks().forEach(t=>t.stop());S.stream=null;
+  clearInterval(S.interval);S.scanning=false;
+  $('btn-start').innerHTML='▶ Caméra';$('btn-start').className='btn btn-primary';
+}
+
+// ════════════════════════════════════════════════════════
+// MARKER DETECTION + PERSPECTIVE CROP
+// ════════════════════════════════════════════════════════
+function findMarkerCenters(cnv,cx){
+  const w=cnv.width,h=cnv.height;
+  const d=cx.getImageData(0,0,w,h).data;
+  const zones=[
+    {name:'TL',x1:0,y1:0,x2:w*.35,y2:h*.30},
+    {name:'TR',x1:w*.65,y1:0,x2:w,y2:h*.30},
+    {name:'BL',x1:0,y1:h*.70,x2:w*.35,y2:h},
+    {name:'BR',x1:w*.65,y1:h*.70,x2:w,y2:h},
   ];
+  const centers={};
+  for(const z of zones){
+    let sx=0,sy=0,cnt=0,minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;
+    for(let y=Math.floor(z.y1);y<Math.floor(z.y2);y+=2)
+      for(let x=Math.floor(z.x1);x<Math.floor(z.x2);x+=2){
+        const i=(y*w+x)*4;
+        if(.299*d[i]+.587*d[i+1]+.114*d[i+2]<90){
+          sx+=x;sy+=y;cnt++;
+          if(x<minX)minX=x;if(x>maxX)maxX=x;if(y<minY)minY=y;if(y>maxY)maxY=y;
+        }
+      }
+    centers[z.name]=cnt>40?{found:true,x:sx/cnt,y:sy/cnt,mw:maxX-minX,mh:maxY-minY}:{found:false};
+  }
+  const found=Object.values(centers).filter(c=>c.found).length;
+  const pts={};
+  if(centers.TL.found){const c=centers.TL;pts.TL={x:c.x+c.mw*.3,y:c.y+c.mh*.3};}
+  if(centers.TR.found){const c=centers.TR;pts.TR={x:c.x-c.mw*.3,y:c.y+c.mh*.3};}
+  if(centers.BL.found){const c=centers.BL;pts.BL={x:c.x+c.mw*.3,y:c.y-c.mh*.3};}
+  if(centers.BR.found){const c=centers.BR;pts.BR={x:c.x-c.mw*.3,y:c.y-c.mh*.3};}
+  return{found,pts};
+}
 
-  let markersFound = 0;
-  const detected = [];
-
-  for (const q of quads) {
-    const density = getBlackDensity(data, w, q.x1, q.y1, q.x2, q.y2);
-    // A marker has ~40-65% black (border + pattern)
-    if (density > 0.25 && density < 0.75) {
-      markersFound++;
-      detected.push(q.name);
+function perspectiveCrop(srcCanvas,pts,outW,outH){
+  const dst=document.createElement('canvas');dst.width=outW;dst.height=outH;
+  const dctx=dst.getContext('2d');
+  const sctx=srcCanvas.getContext('2d',{willReadFrequently:true});
+  const sd=sctx.getImageData(0,0,srcCanvas.width,srcCanvas.height);
+  const dd=dctx.createImageData(outW,outH);
+  const{TL:tl,TR:tr,BL:bl,BR:br}=pts;
+  const sw=srcCanvas.width;
+  for(let dy=0;dy<outH;dy++){
+    const ty=dy/outH;
+    for(let dx=0;dx<outW;dx++){
+      const tx=dx/outW;
+      const sx=Math.round((1-ty)*((1-tx)*tl.x+tx*tr.x)+ty*((1-tx)*bl.x+tx*br.x));
+      const sy=Math.round((1-ty)*((1-tx)*tl.y+tx*tr.y)+ty*((1-tx)*bl.y+tx*br.y));
+      if(sx<0||sx>=sw||sy<0||sy>=srcCanvas.height)continue;
+      const si=(sy*sw+sx)*4,di=(dy*outW+dx)*4;
+      dd.data[di]=sd.data[si];dd.data[di+1]=sd.data[si+1];dd.data[di+2]=sd.data[si+2];dd.data[di+3]=255;
     }
   }
-
-  // Estimate confidence
-  const conf = Math.round((markersFound / 4) * 100);
-
-  return { markersFound, detected, conf };
+  dctx.putImageData(dd,0,0);
+  return dst;
 }
 
-function getBlackDensity(data, imgW, x1, y1, x2, y2) {
-  let black = 0, total = 0;
-  const THRESH = 80;
-  for (let y = Math.floor(y1); y < Math.floor(y2); y += 3) {
-    for (let x = Math.floor(x1); x < Math.floor(x2); x += 3) {
-      const i = (y * imgW + x) * 4;
-      const r = data[i], g = data[i+1], b = data[i+2];
-      const lum = 0.299*r + 0.587*g + 0.114*b;
-      if (lum < THRESH) black++;
-      total++;
+function detectFrame(){
+  const v=$('video'),c=$('canvas');
+  if(!S.scanning||v.readyState<2)return;
+  c.width=v.videoWidth;c.height=v.videoHeight;
+  const cx=c.getContext('2d',{willReadFrequently:true});
+  cx.drawImage(v,0,0);
+  const{found}=findMarkerCenters(c,cx);
+  if(found>=3){S.stable++;setStatus(found+'/4 marqueurs…','warn');
+    if(S.stable>=S.STABLE){S.stable=0;stopCam();onCapture(c.toDataURL('image/jpeg',.92));}
+  }else{S.stable=0;setStatus(found>0?found+'/4 — cadrez mieux':'Pointez vers la feuille…','');}
+}
+
+function onCapture(dataUrl){
+  const img=new Image();
+  img.onload=()=>{
+    const c=document.createElement('canvas');c.width=img.width;c.height=img.height;
+    const cx=c.getContext('2d',{willReadFrequently:true});cx.drawImage(img,0,0);
+    const{found,pts}=findMarkerCenters(c,cx);
+    let finalUrl=dataUrl;
+    if(found===4){
+      const outW=900,outH=Math.round(900*297/210);
+      finalUrl=perspectiveCrop(c,pts,outW,outH).toDataURL('image/jpeg',.93);
+    }else if(found>=2){
+      const xs=Object.values(pts).map(p=>p.x),ys=Object.values(pts).map(p=>p.y);
+      const x0=Math.max(0,Math.min(...xs)-20),y0=Math.max(0,Math.min(...ys)-20);
+      const cw=Math.min(c.width,Math.max(...xs)+20)-x0,ch=Math.min(c.height,Math.max(...ys)+20)-y0;
+      const crop=document.createElement('canvas');crop.width=cw;crop.height=ch;
+      crop.getContext('2d').drawImage(c,x0,y0,cw,ch,0,0,cw,ch);
+      finalUrl=crop.toDataURL('image/jpeg',.93);
     }
-  }
-  return total > 0 ? black / total : 0;
-}
-
-// ─── Result display ────────────────────────────────────────────────────────
-function showResult(dataUrl, analysis) {
-  // Stop scanning
-  clearInterval(state.detectionInterval);
-  state.scanning = false;
-  state.capturedDataUrl = dataUrl;
-
-  // Stop camera preview (optional — keep live)
-  // stopCamera();
-
-  // Display
-  resultImg.src = dataUrl;
-  resultPanel.classList.add('visible');
-  resultPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
-
-  // Badges
-  const m = analysis.markersFound;
-  badgeMarkers.textContent = `⬛ ${m}/4 marqueurs`;
-  badgeMarkers.className = 'badge ' + (m === 4 ? 'badge-ok' : m >= 3 ? 'badge-info' : 'badge-warn');
-
-  const now = new Date();
-  badgeDate.textContent = `📅 ${now.toLocaleDateString('fr-FR')}`;
-
-  const conf = analysis.conf;
-  badgeConf.textContent = `🎯 ${conf}% précision`;
-  badgeConf.className = 'badge ' + (conf >= 75 ? 'badge-ok' : 'badge-warn');
-
-  markersInfo.textContent = `Détectés : ${analysis.detected.join(', ') || '—'}`;
-
-  // Draw detected corners on overlay canvas
-  drawMarkerOverlay(dataUrl, analysis);
-
-  updateStatus('✅ Feuille capturée !', true);
-}
-
-function drawMarkerOverlay(dataUrl, analysis) {
-  const img = new Image();
-  img.onload = () => {
-    detectCanvas.width  = resultImg.offsetWidth;
-    detectCanvas.height = resultImg.offsetHeight;
-    const scaleX = detectCanvas.width  / img.width;
-    const scaleY = detectCanvas.height / img.height;
-
-    const quads = {
-      TL: { cx: img.width*.11, cy: img.height*.09 },
-      TR: { cx: img.width*.89, cy: img.height*.09 },
-      BL: { cx: img.width*.11, cy: img.height*.91 },
-      BR: { cx: img.width*.89, cy: img.height*.91 },
-    };
-
-    dCtx.clearRect(0, 0, detectCanvas.width, detectCanvas.height);
-    for (const [name, pos] of Object.entries(quads)) {
-      const found = analysis.detected.includes(name);
-      dCtx.beginPath();
-      dCtx.arc(pos.cx * scaleX, pos.cy * scaleY, 12, 0, Math.PI*2);
-      dCtx.fillStyle = found ? 'rgba(16,185,129,.7)' : 'rgba(239,68,68,.7)';
-      dCtx.fill();
-      dCtx.strokeStyle = 'white';
-      dCtx.lineWidth = 2;
-      dCtx.stroke();
-      dCtx.fillStyle = 'white';
-      dCtx.font = 'bold 10px system-ui';
-      dCtx.textAlign = 'center';
-      dCtx.fillText(found ? '✓' : '✗', pos.cx * scaleX, pos.cy * scaleY + 4);
-    }
+    S.dataUrl=finalUrl;
+    $('preview-img').src=finalUrl;
+    $('b-markers').textContent='⬛ '+found+'/4';
+    $('b-markers').className='badge '+(found===4?'badge-ok':found>=3?'badge-info':'badge-warn');
+    $('b-date').textContent='📅 '+new Date().toLocaleDateString('fr-FR');
+    const ce=$('b-conf');
+    if(found===4){ce.textContent='✂️ Recadré';ce.className='badge badge-ok';}
+    else if(found>=2){ce.textContent='⚠️ Partiel';ce.className='badge badge-warn';}
+    else{ce.textContent='❌ Non recadré';ce.className='badge badge-info';}
+    show('card-preview');$('card-preview').scrollIntoView({behavior:'smooth',block:'start'});
+    setStep(2);
   };
-  img.src = dataUrl;
+  img.src=dataUrl;
 }
 
-function processImage(dataUrl, fromFile) {
-  // Analyze a static image
-  const img = new Image();
-  img.onload = () => {
-    canvas.width = img.width;
-    canvas.height = img.height;
-    ctx.drawImage(img, 0, 0);
-    const result = analyzeFrame(canvas, ctx);
-    showResult(dataUrl, result);
+// ════════════════════════════════════════════════════════
+// OCR
+// ════════════════════════════════════════════════════════
+$('btn-ocr').addEventListener('click',async()=>{
+  if(!S.dataUrl)return;
+  hide('card-preview');show('card-ocr');setStep(2);
+  const steps=['Envoi à Claude…','Analyse de l\'image…','Lecture du tableau…','Extraction…','Finalisation…'];
+  let si=0;const stepEl=$('ocr-step');
+  const iv=setInterval(()=>{si=Math.min(si+1,steps.length-1);stepEl.textContent=steps[si];},1800);
+  try{
+    const b64=S.dataUrl.split(',')[1];
+    const mt=S.dataUrl.startsWith('data:image/png')?'image/png':'image/jpeg';
+    const res=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1500,
+        messages:[{role:'user',content:[
+          {type:'image',source:{type:'base64',media_type:mt,data:b64}},
+          {type:'text',text:`Tu es un OCR spécialisé feuilles de séance sportive manuscrites. Retourne UNIQUEMENT un JSON valide (sans markdown) :
+{"date":"","contexte":"","public_1":"","public_2":"","public_3":"","parties":[{"numero":1,"partie":"","tache":"","duree":"","nbre_joueurs":"","espaces":"","variables":"","methodes_pedagogiques":""}]}
+Max 5 parties. Champs vides="". JSON UNIQUEMENT.`}
+        ]}]})
+    });
+    clearInterval(iv);
+    const data=await res.json();
+    const raw=data.content?.find(b=>b.type==='text')?.text||'{}';
+    let parsed;try{parsed=JSON.parse(raw.replace(/```json|```/g,'').trim());}catch{parsed={};}
+    hide('card-ocr');buildForm(parsed);setStep(3);
+  }catch(err){clearInterval(iv);hide('card-ocr');buildForm({});setStep(3);}
+});
+
+// ════════════════════════════════════════════════════════
+// FORM
+// ════════════════════════════════════════════════════════
+function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function setF(id,val,wid){const el=$(id);if(el)el.value=val||'';if(wid&&val)$(wid)?.classList.add('filled');}
+
+function buildForm(d){
+  setF('v-date',d.date,'fw-date');setF('v-contexte',d.contexte,'fw-contexte');
+  setF('v-pub1',d.public_1,'fw-pub1');setF('v-pub2',d.public_2,'fw-pub2');setF('v-pub3',d.public_3,'fw-pub3');
+  const c=$('parties-container');c.innerHTML='';
+  const parties=d.parties||[];const count=Math.max(parties.length,5);
+  for(let i=0;i<count;i++){
+    const p=parties[i]||{};
+    const div=document.createElement('div');div.className='partie-block';
+    div.innerHTML=`<div class="partie-num">PARTIE ${i+1}</div>
+    <div style="margin-top:6px;">
+      <div class="form-row c2">
+        <div class="field ${p.partie?'filled':''}"><label>Partie</label><textarea id="p${i}-partie" rows="2">${esc(p.partie)}</textarea></div>
+        <div class="field ${p.tache?'filled':''}"><label>Tâche</label><textarea id="p${i}-tache" rows="2">${esc(p.tache)}</textarea></div>
+      </div>
+      <div class="sub-grid c3">
+        <div class="field ${p.duree?'filled':''}"><label>Durée</label><input type="text" id="p${i}-duree" value="${esc(p.duree)}"></div>
+        <div class="field ${p.nbre_joueurs?'filled':''}"><label>Nbre joueurs</label><input type="text" id="p${i}-nbre" value="${esc(p.nbre_joueurs)}"></div>
+        <div class="field ${p.espaces?'filled':''}"><label>Espaces</label><input type="text" id="p${i}-espaces" value="${esc(p.espaces)}"></div>
+      </div>
+      <div class="sub-grid" style="margin-top:8px;">
+        <div class="field ${p.variables?'filled':''}"><label>Variables</label><textarea id="p${i}-variables" rows="2">${esc(p.variables)}</textarea></div>
+        <div class="field ${p.methodes_pedagogiques?'filled':''}"><label>Méthodes péda.</label><textarea id="p${i}-methodes" rows="2">${esc(p.methodes_pedagogiques)}</textarea></div>
+      </div>
+    </div>`;
+    c.appendChild(div);
+  }
+  show('card-form');$('card-form').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function collectForm(){
+  const parties=[];let i=0;
+  while($('p'+i+'-partie')!==null){
+    parties.push({numero:i+1,
+      partie:$('p'+i+'-partie')?.value||'',tache:$('p'+i+'-tache')?.value||'',
+      duree:$('p'+i+'-duree')?.value||'',nbre_joueurs:$('p'+i+'-nbre')?.value||'',
+      espaces:$('p'+i+'-espaces')?.value||'',variables:$('p'+i+'-variables')?.value||'',
+      methodes_pedagogiques:$('p'+i+'-methodes')?.value||''});i++;
+  }
+  return{date:$('v-date')?.value||'',contexte:$('v-contexte')?.value||'',
+    public_1:$('v-pub1')?.value||'',public_2:$('v-pub2')?.value||'',public_3:$('v-pub3')?.value||'',
+    captured_at:new Date().toISOString(),parties};
+}
+
+// Reset
+function resetToScan(){
+  hide('card-preview');hide('card-form');hide('card-ocr');
+  S.dataUrl=null;S.pendingData=null;setStep(1);startCam();
+}
+$('btn-retry').addEventListener('click',resetToScan);
+$('btn-new').addEventListener('click',resetToScan);
+
+// ════════════════════════════════════════════════════════
+// SAVE MODAL — triggered from both "Sauvegarder" buttons
+// ════════════════════════════════════════════════════════
+function openSaveModal(formData){
+  S.pendingData=formData;
+  const db=getDB();
+  const sel=$('ms-folder');sel.innerHTML='';
+  db.folders.forEach(f=>{
+    const o=document.createElement('option');o.value=f.id;o.textContent=f.name;sel.appendChild(o);
+  });
+  // Suggest a name from date + context
+  const d=formData.date||new Date().toLocaleDateString('fr-FR');
+  const ctx=formData.contexte?` — ${formData.contexte}`:'';
+  $('ms-name').value=`Séance ${d}${ctx}`;
+  show('modal-save');
+}
+
+$('btn-save-quick').addEventListener('click',()=>{
+  openSaveModal({captured_at:new Date().toISOString(),date:new Date().toLocaleDateString('fr-FR'),contexte:'',public_1:'',public_2:'',public_3:'',parties:[]});
+});
+$('btn-save-form').addEventListener('click',()=>{ openSaveModal(collectForm()); });
+
+$('ms-confirm').addEventListener('click',()=>{
+  const name=$('ms-name').value.trim()||'Séance sans titre';
+  const folderId=$('ms-folder').value;
+  const db=getDB();
+  const session={
+    id:'s_'+Date.now(),
+    name,folderId,
+    thumb:S.dataUrl||null,
+    data:S.pendingData,
+    created_at:new Date().toISOString()
   };
-  img.src = dataUrl;
+  db.sessions.push(session);saveDB(db);
+  hide('modal-save');
+  resetToScan();
+  switchTab('lib');
+});
+$('ms-cancel').addEventListener('click',()=>hide('modal-save'));
+
+// ════════════════════════════════════════════════════════
+// NEW FOLDER MODAL
+// ════════════════════════════════════════════════════════
+$('btn-new-folder').addEventListener('click',()=>{$('mf-name').value='';show('modal-folder');$('mf-name').focus();});
+$('mf-confirm').addEventListener('click',()=>{
+  const name=$('mf-name').value.trim();if(!name)return;
+  const db=getDB();
+  db.folders.push({id:'f_'+Date.now(),name});saveDB(db);
+  hide('modal-folder');renderLibrary();
+});
+$('mf-cancel').addEventListener('click',()=>hide('modal-folder'));
+$('mf-name').addEventListener('keydown',e=>{if(e.key==='Enter')$('mf-confirm').click();});
+
+// ════════════════════════════════════════════════════════
+// RENAME / MOVE MODAL
+// ════════════════════════════════════════════════════════
+let _renameId=null;
+function openRenameModal(sid){
+  _renameId=sid;
+  const db=getDB();
+  const sess=db.sessions.find(s=>s.id===sid);if(!sess)return;
+  $('mr-name').value=sess.name;
+  const sel=$('mr-folder');sel.innerHTML='';
+  db.folders.forEach(f=>{
+    const o=document.createElement('option');o.value=f.id;o.textContent=f.name;
+    if(f.id===sess.folderId)o.selected=true;
+    sel.appendChild(o);
+  });
+  show('modal-rename');$('mr-name').focus();
+}
+$('mr-confirm').addEventListener('click',()=>{
+  const name=$('mr-name').value.trim();if(!name)return;
+  const db=getDB();
+  const sess=db.sessions.find(s=>s.id===_renameId);
+  if(sess){sess.name=name;sess.folderId=$('mr-folder').value;saveDB(db);}
+  hide('modal-rename');renderLibrary();
+});
+$('mr-cancel').addEventListener('click',()=>hide('modal-rename'));
+
+// ════════════════════════════════════════════════════════
+// SESSION DETAIL MODAL
+// ════════════════════════════════════════════════════════
+function openDetail(sid){
+  const db=getDB();
+  const sess=db.sessions.find(s=>s.id===sid);if(!sess)return;
+  $('detail-title').textContent=sess.name;
+  $('session-detail-img').src=sess.thumb||'';
+  $('session-detail-img').style.display=sess.thumb?'block':'none';
+  const d=sess.data||{};
+  let html=`<b>Date :</b> ${d.date||'—'}<br><b>Contexte :</b> ${d.contexte||'—'}<br>`;
+  (d.parties||[]).forEach((p,i)=>{
+    if(p.partie||p.tache||p.duree)
+      html+=`<br><b>Partie ${i+1} :</b> ${p.partie||'—'} — ${p.tache||''} (${p.duree||'?'})`;
+  });
+  $('detail-data').innerHTML=html||'Aucune donnée.';
+  $('detail-dl').onclick=()=>{
+    if(!sess.thumb)return;
+    const a=document.createElement('a');a.href=sess.thumb;
+    a.download=sess.name.replace(/[^a-z0-9]/gi,'_')+'.jpg';a.click();
+  };
+  show('modal-detail');
+}
+$('detail-close').addEventListener('click',()=>hide('modal-detail'));
+
+// ════════════════════════════════════════════════════════
+// DELETE SESSION
+// ════════════════════════════════════════════════════════
+function deleteSession(sid){
+  if(!confirm('Supprimer cette séance ?'))return;
+  const db=getDB();
+  db.sessions=db.sessions.filter(s=>s.id!==sid);saveDB(db);renderLibrary();
 }
 
-// ─── UI helpers ────────────────────────────────────────────────────────────
-function updateStatus(msg, ok) {
-  statusBadge.textContent = msg;
-  statusBadge.className   = ok ? 'detected' : '';
+// ════════════════════════════════════════════════════════
+// DELETE FOLDER
+// ════════════════════════════════════════════════════════
+function deleteFolder(fid){
+  if(fid==='default'){alert('Le dossier par défaut ne peut pas être supprimé.');return;}
+  const db=getDB();
+  const count=db.sessions.filter(s=>s.folderId===fid).length;
+  if(count>0&&!confirm(`Ce dossier contient ${count} séance(s). Déplacer vers "Sans dossier" et supprimer ?`))return;
+  db.sessions.forEach(s=>{if(s.folderId===fid)s.folderId='default';});
+  db.folders=db.folders.filter(f=>f.id!==fid);saveDB(db);renderLibrary();
 }
 
-// ─── Retry ────────────────────────────────────────────────────────────────
-btnRetry.addEventListener('click', () => {
-  resultPanel.classList.remove('visible');
-  exportBox.classList.remove('visible');
-  state.capturedDataUrl = null;
-  if (state.stream) {
-    state.scanning = true;
-    state.stableFrames = 0;
-    state.detectionInterval = setInterval(detectFrame, 200);
-    updateStatus('Pointez vers la feuille…', false);
+// ════════════════════════════════════════════════════════
+// RENDER LIBRARY
+// ════════════════════════════════════════════════════════
+function renderLibrary(){
+  const db=getDB();
+  const q=$('lib-search').value.toLowerCase();
+  const container=$('folder-list');container.innerHTML='';
+
+  let hasSomething=false;
+
+  db.folders.forEach(folder=>{
+    const sessions=db.sessions.filter(s=>
+      s.folderId===folder.id&&(!q||s.name.toLowerCase().includes(q))
+    );
+    if(q&&sessions.length===0)return;
+    hasSomething=true;
+
+    const fi=document.createElement('div');fi.className='folder-item';fi.id='fi-'+folder.id;
+
+    fi.innerHTML=`
+      <div class="folder-header" onclick="toggleFolder('${folder.id}')">
+        <span class="folder-icon">📁</span>
+        <span class="folder-name">${folder.name}</span>
+        <span class="folder-count">${sessions.length}</span>
+        ${folder.id!=='default'?`<button onclick="event.stopPropagation();deleteFolder('${folder.id}')" style="background:none;border:none;font-size:13px;color:var(--muted);cursor:pointer;padding:2px 6px;">🗑</button>`:''}
+        <span class="folder-chevron">›</span>
+      </div>
+      <div class="folder-body">
+        ${sessions.length===0
+          ? '<p style="font-size:12px;color:var(--muted);text-align:center;padding:12px 0;">Dossier vide</p>'
+          : `<div class="session-grid">${sessions.map(s=>`
+            <div class="session-card">
+              ${s.thumb
+                ? `<img class="session-thumb" src="${s.thumb}" alt="" onclick="openDetail('${s.id}')">`
+                : `<div class="session-thumb-empty" onclick="openDetail('${s.id}')">📋</div>`}
+              <div class="session-info" onclick="openDetail('${s.id}')">
+                <div class="session-name">${s.name}</div>
+                <div class="session-meta">${s.created_at?new Date(s.created_at).toLocaleDateString('fr-FR'):''}</div>
+              </div>
+              <div class="session-actions">
+                <button class="action-btn" onclick="openRenameModal('${s.id}')">✏️</button>
+                <button class="action-btn del" onclick="deleteSession('${s.id}')">🗑</button>
+              </div>
+            </div>`).join('')}</div>`
+        }
+      </div>`;
+
+    container.appendChild(fi);
+    // Auto-open if has sessions or search active
+    if(sessions.length>0||q) fi.classList.add('open');
+  });
+
+  if(!hasSomething){
+    container.innerHTML=`<div class="empty-lib">
+      <div class="empty-icon">📭</div>
+      <p>Aucune séance enregistrée.<br>Scannez une feuille et sauvegardez-la !</p>
+    </div>`;
   }
-});
+}
 
-// ─── Save (in memory list) ─────────────────────────────────────────────────
-const sessions = [];
+function toggleFolder(fid){
+  $('fi-'+fid)?.classList.toggle('open');
+}
 
-btnSave.addEventListener('click', () => {
-  if (!state.capturedDataUrl) return;
-  sessions.push({ date: new Date().toISOString(), img: state.capturedDataUrl });
-  btnSave.textContent = `✅ Sauvegardé (${sessions.length})`;
-  btnSave.disabled = true;
-  setTimeout(() => { btnSave.textContent = '💾 Sauvegarder'; btnSave.disabled = false; }, 2000);
-});
+// Search live
+$('lib-search').addEventListener('input',renderLibrary);
 
-// ─── Export ───────────────────────────────────────────────────────────────
-btnExport.addEventListener('click', () => {
-  exportBox.classList.toggle('visible');
-  exportBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-});
-
-btnDownload.addEventListener('click', () => {
-  if (!state.capturedDataUrl) return;
-  const a = document.createElement('a');
-  a.href = state.capturedDataUrl;
-  const d = new Date().toISOString().slice(0,10);
-  a.download = `seance_${d}.png`;
-  a.click();
-});
-
-btnShare.addEventListener('click', async () => {
-  if (!navigator.share || !state.capturedDataUrl) {
-    alert('Utilisez le bouton Télécharger puis partagez le fichier manuellement.');
-    return;
-  }
-  try {
-    const blob = await (await fetch(state.capturedDataUrl)).blob();
-    const file = new File([blob], 'seance.png', { type: 'image/png' });
-    await navigator.share({ files: [file], title: 'Ma séance' });
-  } catch(e) {
-    console.warn('Share error', e);
-  }
-});
-
-// ─── Init ─────────────────────────────────────────────────────────────────
-// Auto-start camera if permissions already granted
-navigator.permissions?.query({ name: 'camera' }).then(res => {
-  if (res.state === 'granted') startCamera();
-});
+// ════════════════════════════════════════════════════════
+// INIT
+// ════════════════════════════════════════════════════════
+navigator.permissions?.query({name:'camera'}).then(r=>{if(r.state==='granted')startCam();}).catch(()=>{});
+initDB();
 </script>
 </body>
 </html>
