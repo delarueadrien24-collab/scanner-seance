@@ -419,6 +419,7 @@ function stopCam(){
 // MARKER DETECTION + PERSPECTIVE CROP
 // ════════════════════════════════════════════════════════
 // ── ArUco marker detection via OpenCV.js ─────────────
+// IDs: 0=TL, 1=TR, 2=BL, 3=BR (DICT_4X4_50)
 function findMarkersArUco(cnv){
   if(!cvReady||!window.cv) return null;
   try{
@@ -430,40 +431,58 @@ function findMarkersArUco(cnv){
     const corners = new cv.MatVector();
     const ids = new cv.Mat();
     const params = new cv.DetectorParameters();
-
-    // Tune for printed markers
+    // Tuned for printed A4 markers photographed with phone
     params.adaptiveThreshWinSizeMin = 3;
-    params.adaptiveThreshWinSizeMax = 23;
-    params.adaptiveThreshWinSizeStep = 10;
-    params.minMarkerPerimeterRate = 0.01;
+    params.adaptiveThreshWinSizeMax = 53;
+    params.adaptiveThreshWinSizeStep = 4;
+    params.minMarkerPerimeterRate = 0.005;
     params.maxMarkerPerimeterRate = 4.0;
     params.polygonalApproxAccuracyRate = 0.05;
+    params.minCornerDistanceRate = 0.01;
+    params.perspectiveRemovePixelPerCell = 8;
+    params.perspectiveRemoveIgnoredMarginPerCell = 0.13;
 
     cv.detectMarkers(gray, dict, corners, ids, params);
 
-    const result = { found: 0, pts: {} };
-    const cornerMap = {0:'TL', 1:'TR', 2:'BL', 3:'BR'};
+    const result = { found:0, pts:{}, markerSizePx:0 };
+    // ID → corner name mapping (matches PDF generation)
+    const idMap = {0:'TL', 1:'TR', 2:'BL', 3:'BR'};
 
     if(ids.rows > 0){
       for(let i=0; i<ids.rows; i++){
-        const id = ids.intAt(i, 0);
-        const name = cornerMap[id];
-        if(!name) continue;
+        const id = ids.intAt(i,0);
+        const name = idMap[id];
+        if(name===undefined) continue;
         const c = corners.get(i);
-        // Each corner mat has 4 points: TL,TR,BR,BL of the marker
-        // Use center of marker
-        const cx2 = (c.floatAt(0,0)+c.floatAt(0,2)+c.floatAt(0,4)+c.floatAt(0,6))/4;
-        const cy2 = (c.floatAt(0,1)+c.floatAt(0,3)+c.floatAt(0,5)+c.floatAt(0,7))/4;
-        // Inner corner toward document: depends on which corner
-        const w=cnv.width, h=cnv.height;
-        const ox=Math.round(w*0.04), oy=Math.round(h*0.04);
-        if(name==='TL') result.pts.TL={x:cx2+ox, y:cy2+oy};
-        if(name==='TR') result.pts.TR={x:cx2-ox, y:cy2+oy};
-        if(name==='BL') result.pts.BL={x:cx2+ox, y:cy2-oy};
-        if(name==='BR') result.pts.BR={x:cx2-ox, y:cy2-oy};
+        // corners layout: [x0,y0, x1,y1, x2,y2, x3,y3] = TL,TR,BR,BL of marker
+        const pts_x = [c.floatAt(0,0),c.floatAt(0,2),c.floatAt(0,4),c.floatAt(0,6)];
+        const pts_y = [c.floatAt(0,1),c.floatAt(0,3),c.floatAt(0,5),c.floatAt(0,7)];
+        const cx2 = pts_x.reduce((a,b)=>a+b,0)/4;
+        const cy2 = pts_y.reduce((a,b)=>a+b,0)/4;
+        // Marker size in pixels (for computing crop offset)
+        const mSize = Math.max(...pts_x)-Math.min(...pts_x);
+        result.markerSizePx = Math.max(result.markerSizePx, mSize);
+        // Crop point = just past the inner edge of each marker
+        // Use marker size * 0.6 as offset from center toward document
+        const off = mSize * 0.6;
+        if(name==='TL') result.pts.TL={x:cx2+off, y:cy2+off};
+        if(name==='TR') result.pts.TR={x:cx2-off, y:cy2+off};
+        if(name==='BL') result.pts.BL={x:cx2+off, y:cy2-off};
+        if(name==='BR') result.pts.BR={x:cx2-off, y:cy2-off};
         result.found++;
         c.delete();
       }
+    }
+    // Interpolate missing corner if 3 found
+    if(result.found===3){
+      if(!result.pts.TL&&result.pts.TR&&result.pts.BL&&result.pts.BR)
+        result.pts.TL={x:result.pts.BL.x, y:result.pts.TR.y};
+      else if(!result.pts.TR&&result.pts.TL&&result.pts.BL&&result.pts.BR)
+        result.pts.TR={x:result.pts.BR.x, y:result.pts.TL.y};
+      else if(!result.pts.BL&&result.pts.TL&&result.pts.TR&&result.pts.BR)
+        result.pts.BL={x:result.pts.TL.x, y:result.pts.BR.y};
+      else if(!result.pts.BR&&result.pts.TL&&result.pts.TR&&result.pts.BL)
+        result.pts.BR={x:result.pts.TR.x, y:result.pts.BL.y};
     }
     src.delete(); gray.delete(); corners.delete(); ids.delete();
     return result;
