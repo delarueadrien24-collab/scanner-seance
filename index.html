@@ -409,14 +409,35 @@ function stopCam(){
 // ════════════════════════════════════════════════════════
 // MARKER DETECTION + PERSPECTIVE CROP
 // ════════════════════════════════════════════════════════
+// Sharpness check via Laplacian variance
+function computeSharpness(cnv,cx){
+  const w=cnv.width,h=cnv.height;
+  const x0=Math.floor(w*.25),y0=Math.floor(h*.25),x1=Math.floor(w*.75),y1=Math.floor(h*.75);
+  const d=cx.getImageData(x0,y0,x1-x0,y1-y0).data;
+  const sw=x1-x0;
+  let v=0,count=0;
+  for(let y=1;y<(y1-y0)-1;y+=3){
+    for(let x=1;x<sw-1;x+=3){
+      const lum=.299*d[(y*sw+x)*4]+.587*d[(y*sw+x)*4+1]+.114*d[(y*sw+x)*4+2];
+      const t=.299*d[((y-1)*sw+x)*4]+.587*d[((y-1)*sw+x)*4+1]+.114*d[((y-1)*sw+x)*4+2];
+      const b=.299*d[((y+1)*sw+x)*4]+.587*d[((y+1)*sw+x)*4+1]+.114*d[((y+1)*sw+x)*4+2];
+      const l=.299*d[(y*sw+x-1)*4]+.587*d[(y*sw+x-1)*4+1]+.114*d[(y*sw+x-1)*4+2];
+      const r=.299*d[(y*sw+x+1)*4]+.587*d[(y*sw+x+1)*4+1]+.114*d[(y*sw+x+1)*4+2];
+      const lap=Math.abs(4*lum-t-b-l-r);
+      v+=lap*lap;count++;
+    }
+  }
+  return count>0?v/count:0;
+}
+
 function findMarkerCenters(cnv,cx){
   const w=cnv.width,h=cnv.height;
   const d=cx.getImageData(0,0,w,h).data;
   const zones=[
-    {name:'TL',x1:0,y1:0,x2:w*.35,y2:h*.30},
-    {name:'TR',x1:w*.65,y1:0,x2:w,y2:h*.30},
-    {name:'BL',x1:0,y1:h*.70,x2:w*.35,y2:h},
-    {name:'BR',x1:w*.65,y1:h*.70,x2:w,y2:h},
+    {name:'TL',x1:0,     y1:0,     x2:w*.30,y2:h*.25},
+    {name:'TR',x1:w*.70, y1:0,     x2:w,    y2:h*.25},
+    {name:'BL',x1:0,     y1:h*.75, x2:w*.30,y2:h    },
+    {name:'BR',x1:w*.70, y1:h*.75, x2:w,    y2:h    },
   ];
   const centers={};
   for(const z of zones){
@@ -429,14 +450,16 @@ function findMarkerCenters(cnv,cx){
           if(x<minX)minX=x;if(x>maxX)maxX=x;if(y<minY)minY=y;if(y>maxY)maxY=y;
         }
       }
-    centers[z.name]=cnt>40?{found:true,x:sx/cnt,y:sy/cnt,mw:maxX-minX,mh:maxY-minY}:{found:false};
+    centers[z.name]=cnt>30?{found:true,x:sx/cnt,y:sy/cnt,minX,maxX,minY,maxY}:{found:false};
   }
   const found=Object.values(centers).filter(c=>c.found).length;
   const pts={};
-  if(centers.TL.found){const c=centers.TL;pts.TL={x:c.x+c.mw*.3,y:c.y+c.mh*.3};}
-  if(centers.TR.found){const c=centers.TR;pts.TR={x:c.x-c.mw*.3,y:c.y+c.mh*.3};}
-  if(centers.BL.found){const c=centers.BL;pts.BL={x:c.x+c.mw*.3,y:c.y-c.mh*.3};}
-  if(centers.BR.found){const c=centers.BR;pts.BR={x:c.x-c.mw*.3,y:c.y-c.mh*.3};}
+  // Crop boundary = outer edge of each marker + small padding
+  const pad=4;
+  if(centers.TL.found){const c=centers.TL;pts.TL={x:c.maxX+pad,y:c.maxY+pad};}
+  if(centers.TR.found){const c=centers.TR;pts.TR={x:c.minX-pad,y:c.maxY+pad};}
+  if(centers.BL.found){const c=centers.BL;pts.BL={x:c.maxX+pad,y:c.minY-pad};}
+  if(centers.BR.found){const c=centers.BR;pts.BR={x:c.minX-pad,y:c.minY-pad};}
   return{found,pts};
 }
 
@@ -470,9 +493,16 @@ function detectFrame(){
   const cx=c.getContext('2d',{willReadFrequently:true});
   cx.drawImage(v,0,0);
   const{found}=findMarkerCenters(c,cx);
-  if(found>=3){S.stable++;setStatus(found+'/4 marqueurs…','warn');
-    if(S.stable>=S.STABLE){S.stable=0;stopCam();onCapture(c.toDataURL('image/jpeg',.92));}
-  }else{S.stable=0;setStatus(found>0?found+'/4 — cadrez mieux':'Pointez vers la feuille…','');}
+  if(found>=4){
+    const sharp=computeSharpness(c,cx);
+    if(sharp<80){S.stable=0;setStatus('Maintenez la caméra immobile…','warn');return;}
+    S.stable++;setStatus('4/4 ✓ Ne bougez plus…','warn');
+    if(S.stable>=S.STABLE){S.stable=0;stopCam();onCapture(c.toDataURL('image/jpeg',.95));}
+  }else if(found>=3){
+    S.stable=0;setStatus(found+'/4 — cadrez tous les coins','warn');
+  }else{
+    S.stable=0;setStatus(found>0?found+'/4 — reculez pour voir toute la feuille':'Pointez vers la feuille…','');
+  }
 }
 
 function onCapture(dataUrl){
