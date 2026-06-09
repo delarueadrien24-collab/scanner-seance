@@ -159,6 +159,7 @@ canvas{display:none;}
       <div id="scanner-wrap">
         <video id="video" autoplay playsinline muted></video>
         <canvas id="canvas"></canvas>
+        <canvas id="overlay-canvas" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;"></canvas>
         <div class="corner tl"></div><div class="corner tr"></div>
         <div class="corner bl"></div><div class="corner br"></div>
         <div id="scan-line"></div>
@@ -464,6 +465,13 @@ function findMarkerCenters(cnv,cx){
   if(centers.TR.found){const c=centers.TR;pts.TR={x:c.minX-ox,y:c.maxY+oy};}
   if(centers.BL.found){const c=centers.BL;pts.BL={x:c.maxX+ox,y:c.minY-oy};}
   if(centers.BR.found){const c=centers.BR;pts.BR={x:c.minX-ox,y:c.minY-oy};}
+  // Interpolate missing corner from the 3 others
+  if(found===3){
+    if(!pts.TL&&pts.TR&&pts.BL&&pts.BR) pts.TL={x:pts.BL.x,y:pts.TR.y};
+    else if(!pts.TR&&pts.TL&&pts.BL&&pts.BR) pts.TR={x:pts.BR.x,y:pts.TL.y};
+    else if(!pts.BL&&pts.TL&&pts.TR&&pts.BR) pts.BL={x:pts.TL.x,y:pts.BR.y};
+    else if(!pts.BR&&pts.TL&&pts.TR&&pts.BL) pts.BR={x:pts.TR.x,y:pts.BL.y};
+  }
   return{found,pts};
 }
 
@@ -490,22 +498,60 @@ function perspectiveCrop(srcCanvas,pts,outW,outH){
   return dst;
 }
 
+function drawOverlay(pts, found, sharp){
+  const oc=$('overlay-canvas');
+  if(!oc)return;
+  const v=$('video');
+  oc.width=v.offsetWidth; oc.height=v.offsetHeight;
+  const ox2=oc.getContext('2d');
+  ox2.clearRect(0,0,oc.width,oc.height);
+  const scaleX=oc.width/v.videoWidth, scaleY=oc.height/v.videoHeight;
+  // Draw crop rectangle if all 4 found
+  if(found===4&&pts.TL&&pts.TR&&pts.BL&&pts.BR){
+    ox2.strokeStyle=sharp>=150?'#10b981':'#f59e0b';
+    ox2.lineWidth=2;
+    ox2.setLineDash([8,4]);
+    ox2.beginPath();
+    ox2.moveTo(pts.TL.x*scaleX, pts.TL.y*scaleY);
+    ox2.lineTo(pts.TR.x*scaleX, pts.TR.y*scaleY);
+    ox2.lineTo(pts.BR.x*scaleX, pts.BR.y*scaleY);
+    ox2.lineTo(pts.BL.x*scaleX, pts.BL.y*scaleY);
+    ox2.closePath();
+    ox2.stroke();
+  }
+  // Draw detected corner dots
+  const corners={TL:pts.TL,TR:pts.TR,BL:pts.BL,BR:pts.BR};
+  for(const[name,pt] of Object.entries(corners)){
+    if(!pt)continue;
+    ox2.beginPath();
+    ox2.arc(pt.x*scaleX, pt.y*scaleY, 8, 0, Math.PI*2);
+    ox2.fillStyle='#10b981';
+    ox2.fill();
+    ox2.strokeStyle='white';
+    ox2.lineWidth=2;
+    ox2.setLineDash([]);
+    ox2.stroke();
+  }
+}
+
 function detectFrame(){
   const v=$('video'),c=$('canvas');
   if(!S.scanning||v.readyState<2)return;
   c.width=v.videoWidth;c.height=v.videoHeight;
   const cx=c.getContext('2d',{willReadFrequently:true});
   cx.drawImage(v,0,0);
-  const{found}=findMarkerCenters(c,cx);
+  const{found,pts}=findMarkerCenters(c,cx);
   if(found>=4){
     const sharp=computeSharpness(c,cx);
-    if(sharp<150){S.stable=0;setStatus('Restez immobile — netteté insuffisante…','warn');return;}
-    S.stable++;setStatus('4/4 ✓ Ne bougez plus…','warn');
-    if(S.stable>=S.STABLE){S.stable=0;stopCam();onCapture(c.toDataURL('image/jpeg',.95));}
-  }else if(found>=3){
-    S.stable=0;setStatus(found+'/4 — cadrez tous les coins','warn');
+    drawOverlay(pts,found,sharp);
+    if(sharp<150){S.stable=0;setStatus('4/4 — restez immobile…','warn');return;}
+    S.stable++;
+    setStatus('4/4 ✓ Capture dans '+(S.STABLE-S.stable)+'…','warn');
+    if(S.stable>=S.STABLE){S.stable=0;stopCam();onCapture(c.toDataURL('image/jpeg',.96));}
   }else{
-    S.stable=0;setStatus(found>0?found+'/4 — reculez pour voir toute la feuille':'Pointez vers la feuille…','');
+    drawOverlay(pts,found,0);
+    S.stable=0;
+    setStatus(found>0?found+'/4 — cadrez tous les coins':'Pointez vers la feuille…','');
   }
 }
 
@@ -555,7 +601,7 @@ function onCapture(dataUrl){
     let finalUrl=dataUrl;
     let cropMethod='';
 
-    if(found===4){
+    if(found>=3&&pts.TL&&pts.TR&&pts.BL&&pts.BR){
       // Best case: full perspective crop using markers
       const outW=1400,outH=Math.round(1400*297/210);
       const cropped=perspectiveCrop(c,pts,outW,outH);
