@@ -359,8 +359,10 @@ function mergeAndPush(local,remote){
 
 function setSyncStatus(state,msg){
   const el=$('sync-status');if(!el)return;
-  const c={sync:'#f59e0b',ok:'#10b981',error:'#ef4444'};
+  const c={sync:'#f59e0b',ok:'#10b981',error:'#a0a0cc'};
   el.textContent=msg;el.style.color=c[state]||'#aaa';
+  // Don't show error prominently - app works offline with localStorage
+  el.style.display=(state==='ok'||state==='sync')?'block':'none';
 }
 
 // ════════════════════════════════════════════════════════
@@ -396,7 +398,7 @@ async function startCam(){
     S.stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:3840},height:{ideal:2160},focusMode:{ideal:'continuous'}}});
     $('video').srcObject=S.stream;await $('video').play();
     $('btn-start').innerHTML='⏹ Arrêter';$('btn-start').disabled=false;$('btn-start').className='btn btn-outline';
-    S.scanning=true;S.interval=setInterval(detectFrame,200);
+    S.scanning=true;S.interval=setInterval(detectFrame,300);
     setStatus('Pointez vers la feuille…','');
   }catch(e){$('btn-start').innerHTML='▶ Caméra';$('btn-start').disabled=false;alert('Caméra : '+e.message);}
 }
@@ -454,13 +456,14 @@ function findMarkerCenters(cnv,cx){
   }
   const found=Object.values(centers).filter(c=>c.found).length;
   const pts={};
-  // Crop boundary = just inside marker inner edge
-  // Offset calibrated from reference image: ~9% width inward, ~5% height inward
-  const ox=Math.round(w*0.09), oy=Math.round(h*0.05);
-  if(centers.TL.found){const c=centers.TL;pts.TL={x:c.maxX-ox,y:c.maxY-oy};}
-  if(centers.TR.found){const c=centers.TR;pts.TR={x:c.minX+ox,y:c.maxY-oy};}
-  if(centers.BL.found){const c=centers.BL;pts.BL={x:c.maxX-ox,y:c.minY+oy};}
-  if(centers.BR.found){const c=centers.BR;pts.BR={x:c.minX+ox,y:c.minY+oy};}
+  // Crop boundary = just outside marker inner edge (toward document center)
+  // ox: horizontal inset from marker inner edge, oy: vertical inset
+  // Positive = toward center of image (away from corner)
+  const ox=Math.round(w*0.02), oy=Math.round(h*0.02);
+  if(centers.TL.found){const c=centers.TL;pts.TL={x:c.maxX+ox,y:c.maxY+oy};}
+  if(centers.TR.found){const c=centers.TR;pts.TR={x:c.minX-ox,y:c.maxY+oy};}
+  if(centers.BL.found){const c=centers.BL;pts.BL={x:c.maxX+ox,y:c.minY-oy};}
+  if(centers.BR.found){const c=centers.BR;pts.BR={x:c.minX-ox,y:c.minY-oy};}
   return{found,pts};
 }
 
@@ -555,7 +558,13 @@ function onCapture(dataUrl){
     if(found===4){
       // Best case: full perspective crop using markers
       const outW=1400,outH=Math.round(1400*297/210);
-      finalUrl=perspectiveCrop(c,pts,outW,outH).toDataURL('image/jpeg',.96);
+      const cropped=perspectiveCrop(c,pts,outW,outH);
+      // Apply sharpening via contrast canvas filter
+      const sharp=document.createElement('canvas');sharp.width=outW;sharp.height=outH;
+      const sctx=sharp.getContext('2d');
+      sctx.filter='contrast(1.08) brightness(1.03)';
+      sctx.drawImage(cropped,0,0);
+      finalUrl=sharp.toDataURL('image/jpeg',.96);
       cropMethod='✂️ Recadré';
     } else {
       // Fallback: detect table borders from the content itself
