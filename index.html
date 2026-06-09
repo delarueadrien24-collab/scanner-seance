@@ -293,7 +293,7 @@ canvas{display:none;}
 // ════════════════════════════════════════════════════════
 // STATE
 // ════════════════════════════════════════════════════════
-const S={stream:null,scanning:false,stable:0,STABLE:8,dataUrl:null,interval:null,pendingData:null};
+const S={stream:null,scanning:false,stable:0,STABLE:12,dataUrl:null,interval:null,pendingData:null};
 const $=id=>document.getElementById(id);
 const show=id=>$(id).classList.remove('hidden');
 const hide=id=>$(id).classList.add('hidden');
@@ -393,7 +393,7 @@ $('file-input').addEventListener('change',e=>{
 async function startCam(){
   try{
     $('btn-start').innerHTML='⏳';$('btn-start').disabled=true;
-    S.stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:960}}});
+    S.stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:3840},height:{ideal:2160},focusMode:{ideal:'continuous'}}});
     $('video').srcObject=S.stream;await $('video').play();
     $('btn-start').innerHTML='⏹ Arrêter';$('btn-start').disabled=false;$('btn-start').className='btn btn-outline';
     S.scanning=true;S.interval=setInterval(detectFrame,200);
@@ -454,12 +454,13 @@ function findMarkerCenters(cnv,cx){
   }
   const found=Object.values(centers).filter(c=>c.found).length;
   const pts={};
-  // Crop boundary = outer edge of each marker + small padding
-  const pad=4;
-  if(centers.TL.found){const c=centers.TL;pts.TL={x:c.maxX+pad,y:c.maxY+pad};}
-  if(centers.TR.found){const c=centers.TR;pts.TR={x:c.minX-pad,y:c.maxY+pad};}
-  if(centers.BL.found){const c=centers.BL;pts.BL={x:c.maxX+pad,y:c.minY-pad};}
-  if(centers.BR.found){const c=centers.BR;pts.BR={x:c.minX-pad,y:c.minY-pad};}
+  // Crop boundary = just inside marker inner edge
+  // Offset calibrated from reference image: ~9% width inward, ~5% height inward
+  const ox=Math.round(w*0.09), oy=Math.round(h*0.05);
+  if(centers.TL.found){const c=centers.TL;pts.TL={x:c.maxX-ox,y:c.maxY-oy};}
+  if(centers.TR.found){const c=centers.TR;pts.TR={x:c.minX+ox,y:c.maxY-oy};}
+  if(centers.BL.found){const c=centers.BL;pts.BL={x:c.maxX-ox,y:c.minY+oy};}
+  if(centers.BR.found){const c=centers.BR;pts.BR={x:c.minX+ox,y:c.minY+oy};}
   return{found,pts};
 }
 
@@ -495,7 +496,7 @@ function detectFrame(){
   const{found}=findMarkerCenters(c,cx);
   if(found>=4){
     const sharp=computeSharpness(c,cx);
-    if(sharp<80){S.stable=0;setStatus('Maintenez la caméra immobile…','warn');return;}
+    if(sharp<150){S.stable=0;setStatus('Restez immobile — netteté insuffisante…','warn');return;}
     S.stable++;setStatus('4/4 ✓ Ne bougez plus…','warn');
     if(S.stable>=S.STABLE){S.stable=0;stopCam();onCapture(c.toDataURL('image/jpeg',.95));}
   }else if(found>=3){
@@ -505,6 +506,43 @@ function detectFrame(){
   }
 }
 
+// Find table outer border using strong vertical/horizontal lines
+function findTableBorder(cnv,cx){
+  const w=cnv.width,h=cnv.height;
+  const d=cx.getImageData(0,0,w,h).data;
+  function lum(x,y){const i=(y*w+x)*4;return .299*d[i]+.587*d[i+1]+.114*d[i+2];}
+
+  // Left border: first column with >20% dark pixels (skip outer 2%)
+  let left=Math.floor(w*.02);
+  for(let x=Math.floor(w*.02);x<w*.5;x++){
+    let dark=0;
+    for(let y=Math.floor(h*.1);y<Math.floor(h*.9);y+=4) if(lum(x,y)<120)dark++;
+    if(dark/(h*.8/4)>0.20){left=x;break;}
+  }
+  // Right border
+  let right=Math.floor(w*.98);
+  for(let x=Math.floor(w*.98);x>w*.5;x--){
+    let dark=0;
+    for(let y=Math.floor(h*.1);y<Math.floor(h*.9);y+=4) if(lum(x,y)<120)dark++;
+    if(dark/(h*.8/4)>0.20){right=x;break;}
+  }
+  // Top border
+  let top=Math.floor(h*.02);
+  for(let y=Math.floor(h*.02);y<h*.5;y++){
+    let dark=0;
+    for(let x=Math.floor(w*.1);x<Math.floor(w*.9);x+=4) if(lum(x,y)<120)dark++;
+    if(dark/(w*.8/4)>0.20){top=y;break;}
+  }
+  // Bottom border
+  let bottom=Math.floor(h*.98);
+  for(let y=Math.floor(h*.98);y>h*.5;y--){
+    let dark=0;
+    for(let x=Math.floor(w*.1);x<Math.floor(w*.9);x+=4) if(lum(x,y)<120)dark++;
+    if(dark/(w*.8/4)>0.20){bottom=y;break;}
+  }
+  return{left,right,top,bottom};
+}
+
 function onCapture(dataUrl){
   const img=new Image();
   img.onload=()=>{
@@ -512,26 +550,40 @@ function onCapture(dataUrl){
     const cx=c.getContext('2d',{willReadFrequently:true});cx.drawImage(img,0,0);
     const{found,pts}=findMarkerCenters(c,cx);
     let finalUrl=dataUrl;
+    let cropMethod='';
+
     if(found===4){
-      const outW=900,outH=Math.round(900*297/210);
-      finalUrl=perspectiveCrop(c,pts,outW,outH).toDataURL('image/jpeg',.93);
-    }else if(found>=2){
-      const xs=Object.values(pts).map(p=>p.x),ys=Object.values(pts).map(p=>p.y);
-      const x0=Math.max(0,Math.min(...xs)-20),y0=Math.max(0,Math.min(...ys)-20);
-      const cw=Math.min(c.width,Math.max(...xs)+20)-x0,ch=Math.min(c.height,Math.max(...ys)+20)-y0;
-      const crop=document.createElement('canvas');crop.width=cw;crop.height=ch;
-      crop.getContext('2d').drawImage(c,x0,y0,cw,ch,0,0,cw,ch);
-      finalUrl=crop.toDataURL('image/jpeg',.93);
+      // Best case: full perspective crop using markers
+      const outW=1400,outH=Math.round(1400*297/210);
+      finalUrl=perspectiveCrop(c,pts,outW,outH).toDataURL('image/jpeg',.96);
+      cropMethod='✂️ Recadré';
+    } else {
+      // Fallback: detect table borders from the content itself
+      const{left,right,top,bottom}=findTableBorder(c,cx);
+      const pad=8;
+      const x0=Math.max(0,left-pad),y0=Math.max(0,top-pad);
+      const cw=Math.min(c.width,right+pad)-x0;
+      const ch=Math.min(c.height,bottom+pad)-y0;
+      if(cw>100&&ch>100){
+        // Scale up to good resolution
+        const outW=1200,outH=Math.round(cw>0?ch/cw*1200:1200*297/210);
+        const crop=document.createElement('canvas');crop.width=outW;crop.height=outH;
+        crop.getContext('2d').drawImage(c,x0,y0,cw,ch,0,0,outW,outH);
+        finalUrl=crop.toDataURL('image/jpeg',.96);
+        cropMethod=found>=2?'⚠️ Partiel':'📐 Bordures';
+      } else {
+        cropMethod='❌ Manuel';
+      }
     }
+
     S.dataUrl=finalUrl;
     $('preview-img').src=finalUrl;
     $('b-markers').textContent='⬛ '+found+'/4';
     $('b-markers').className='badge '+(found===4?'badge-ok':found>=3?'badge-info':'badge-warn');
     $('b-date').textContent='📅 '+new Date().toLocaleDateString('fr-FR');
     const ce=$('b-conf');
-    if(found===4){ce.textContent='✂️ Recadré';ce.className='badge badge-ok';}
-    else if(found>=2){ce.textContent='⚠️ Partiel';ce.className='badge badge-warn';}
-    else{ce.textContent='❌ Non recadré';ce.className='badge badge-info';}
+    ce.textContent=cropMethod;
+    ce.className='badge '+(found===4?'badge-ok':'badge-info');
     show('card-preview');$('card-preview').scrollIntoView({behavior:'smooth',block:'start'});
     setStep(2);
   };
