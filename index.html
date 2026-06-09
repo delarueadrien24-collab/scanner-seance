@@ -130,12 +130,7 @@ canvas{display:none;}
 /* ── Session detail ── */
 #session-detail-img{width:100%;border-radius:10px;border:1px solid var(--border);display:block;margin-bottom:12px;}
 </style>
-<script>
-// OpenCV.js ArUco detection loader
-let cvReady = false;
-function onOpenCvReady(){ cvReady = true; console.log('OpenCV ready'); }
-</script>
-<script async src="https://cdn.jsdelivr.net/npm/opencv.js@1.2.1/opencv.js" onload="onOpenCvReady()"></script>
+
 </head>
 <body>
 
@@ -418,75 +413,70 @@ function stopCam(){
 // ════════════════════════════════════════════════════════
 // MARKER DETECTION + PERSPECTIVE CROP
 // ════════════════════════════════════════════════════════
-// ── ArUco marker detection via OpenCV.js ─────────────
-// IDs: 0=TL, 1=TR, 2=BL, 3=BR (DICT_4X4_50)
+// ── Pixel-based ArUco-style marker detection ─────────
+// Detects the 4 printed ArUco markers by finding large black square clusters in each corner
+// Works purely with pixel luminance — no external library needed
 function findMarkersArUco(cnv){
-  if(!cvReady||!window.cv) return null;
-  try{
-    const src = cv.imread(cnv);
-    const gray = new cv.Mat();
-    cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+  const w=cnv.width, h=cnv.height;
+  const cx=cnv.getContext('2d',{willReadFrequently:true});
+  const d=cx.getImageData(0,0,w,h).data;
 
-    const dict = cv.getPredefinedDictionary(cv.DICT_4X4_50);
-    const corners = new cv.MatVector();
-    const ids = new cv.Mat();
-    const params = new cv.DetectorParameters();
-    // Tuned for printed A4 markers photographed with phone
-    params.adaptiveThreshWinSizeMin = 3;
-    params.adaptiveThreshWinSizeMax = 53;
-    params.adaptiveThreshWinSizeStep = 4;
-    params.minMarkerPerimeterRate = 0.005;
-    params.maxMarkerPerimeterRate = 4.0;
-    params.polygonalApproxAccuracyRate = 0.05;
-    params.minCornerDistanceRate = 0.01;
-    params.perspectiveRemovePixelPerCell = 8;
-    params.perspectiveRemoveIgnoredMarginPerCell = 0.13;
+  // Search each corner in a 40% x 35% zone
+  const zones=[
+    {name:'TL',x1:0,      y1:0,      x2:w*.40, y2:h*.35},
+    {name:'TR',x1:w*.60,  y1:0,      x2:w,     y2:h*.35},
+    {name:'BL',x1:0,      y1:h*.65,  x2:w*.40, y2:h    },
+    {name:'BR',x1:w*.60,  y1:h*.65,  x2:w,     y2:h    },
+  ];
 
-    cv.detectMarkers(gray, dict, corners, ids, params);
+  const result={found:0,pts:{},markerSizePx:0};
 
-    const result = { found:0, pts:{}, markerSizePx:0 };
-    // ID → corner name mapping (matches PDF generation)
-    const idMap = {0:'TL', 1:'TR', 2:'BL', 3:'BR'};
-
-    if(ids.rows > 0){
-      for(let i=0; i<ids.rows; i++){
-        const id = ids.intAt(i,0);
-        const name = idMap[id];
-        if(name===undefined) continue;
-        const c = corners.get(i);
-        // corners layout: [x0,y0, x1,y1, x2,y2, x3,y3] = TL,TR,BR,BL of marker
-        const pts_x = [c.floatAt(0,0),c.floatAt(0,2),c.floatAt(0,4),c.floatAt(0,6)];
-        const pts_y = [c.floatAt(0,1),c.floatAt(0,3),c.floatAt(0,5),c.floatAt(0,7)];
-        const cx2 = pts_x.reduce((a,b)=>a+b,0)/4;
-        const cy2 = pts_y.reduce((a,b)=>a+b,0)/4;
-        // Marker size in pixels (for computing crop offset)
-        const mSize = Math.max(...pts_x)-Math.min(...pts_x);
-        result.markerSizePx = Math.max(result.markerSizePx, mSize);
-        // Crop point = just past the inner edge of each marker
-        // Use marker size * 0.6 as offset from center toward document
-        const off = mSize * 0.6;
-        if(name==='TL') result.pts.TL={x:cx2+off, y:cy2+off};
-        if(name==='TR') result.pts.TR={x:cx2-off, y:cy2+off};
-        if(name==='BL') result.pts.BL={x:cx2+off, y:cy2-off};
-        if(name==='BR') result.pts.BR={x:cx2-off, y:cy2-off};
-        result.found++;
-        c.delete();
+  for(const z of zones){
+    // Find all dark pixels in zone
+    let sx=0,sy=0,cnt=0;
+    let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;
+    for(let y=Math.floor(z.y1);y<Math.floor(z.y2);y+=2)
+      for(let x=Math.floor(z.x1);x<Math.floor(z.x2);x+=2){
+        const i=(y*w+x)*4;
+        const lum=.299*d[i]+.587*d[i+1]+.114*d[i+2];
+        if(lum<100){
+          sx+=x;sy+=y;cnt++;
+          if(x<minX)minX=x;if(x>maxX)maxX=x;
+          if(y<minY)minY=y;if(y>maxY)maxY=y;
+        }
       }
-    }
-    // Interpolate missing corner if 3 found
-    if(result.found===3){
-      if(!result.pts.TL&&result.pts.TR&&result.pts.BL&&result.pts.BR)
-        result.pts.TL={x:result.pts.BL.x, y:result.pts.TR.y};
-      else if(!result.pts.TR&&result.pts.TL&&result.pts.BL&&result.pts.BR)
-        result.pts.TR={x:result.pts.BR.x, y:result.pts.TL.y};
-      else if(!result.pts.BL&&result.pts.TL&&result.pts.TR&&result.pts.BR)
-        result.pts.BL={x:result.pts.TL.x, y:result.pts.BR.y};
-      else if(!result.pts.BR&&result.pts.TL&&result.pts.TR&&result.pts.BL)
-        result.pts.BR={x:result.pts.TR.x, y:result.pts.BL.y};
-    }
-    src.delete(); gray.delete(); corners.delete(); ids.delete();
-    return result;
-  } catch(e){ console.warn('ArUco error',e); return null; }
+    if(cnt<20) continue;
+
+    const mw=maxX-minX, mh=maxY-minY;
+    // Validate: marker should be roughly square
+    const ratio=mw>0?mh/mw:0;
+    if(ratio<0.3||ratio>3.0) continue;
+
+    const markerSize=Math.max(mw,mh);
+    result.markerSizePx=Math.max(result.markerSizePx,markerSize);
+
+    // Crop point = inner edge of marker + small gap
+    const off=markerSize*0.55;
+    const cx2=sx/cnt, cy2=sy/cnt;
+    if(z.name==='TL') result.pts.TL={x:cx2+off,y:cy2+off};
+    if(z.name==='TR') result.pts.TR={x:cx2-off,y:cy2+off};
+    if(z.name==='BL') result.pts.BL={x:cx2+off,y:cy2-off};
+    if(z.name==='BR') result.pts.BR={x:cx2-off,y:cy2-off};
+    result.found++;
+  }
+
+  // Interpolate missing corner if 3 found
+  if(result.found===3){
+    if(!result.pts.TL&&result.pts.TR&&result.pts.BL&&result.pts.BR)
+      result.pts.TL={x:result.pts.BL.x,y:result.pts.TR.y};
+    else if(!result.pts.TR&&result.pts.TL&&result.pts.BL&&result.pts.BR)
+      result.pts.TR={x:result.pts.BR.x,y:result.pts.TL.y};
+    else if(!result.pts.BL&&result.pts.TL&&result.pts.TR&&result.pts.BR)
+      result.pts.BL={x:result.pts.TL.x,y:result.pts.BR.y};
+    else if(!result.pts.BR&&result.pts.TL&&result.pts.TR&&result.pts.BL)
+      result.pts.BR={x:result.pts.TR.x,y:result.pts.BL.y};
+  }
+  return result;
 }
 
 // Sharpness check via Laplacian variance
@@ -618,8 +608,7 @@ function detectFrame(){
   const cx=c.getContext('2d',{willReadFrequently:true});
   cx.drawImage(v,0,0);
   // Try ArUco first (OpenCV), fallback to pixel method
-  let detection = cvReady ? findMarkersArUco(c) : null;
-  if(!detection || detection.found < 2) detection = findMarkerCenters(c,cx);
+  const detection = findMarkersArUco(c);
   const{found,pts} = detection;
   if(found>=3){
     const sharp=computeSharpness(c,cx);
@@ -677,8 +666,7 @@ function onCapture(dataUrl){
   img.onload=()=>{
     const c=document.createElement('canvas');c.width=img.width;c.height=img.height;
     const cx=c.getContext('2d',{willReadFrequently:true});cx.drawImage(img,0,0);
-    let detection = cvReady ? findMarkersArUco(c) : null;
-    if(!detection || detection.found < 2) detection = findMarkerCenters(c,cx);
+    const detection = findMarkersArUco(c);
     const{found,pts} = detection;
     let finalUrl=dataUrl;
     let cropMethod='';
